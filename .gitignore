@@ -8,6 +8,8 @@ node_modules/
 .venv/
 venv/
 env/
+env
+backend/env
 ENV/
 .env*
 !.env.example
