@@ -45,7 +45,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } else if (onRender) {
       WS_URL = `${protocol}//${window.location.host}`;
     } else {
-      WS_URL = 'wss://pitchnest-live.onrender.com';
+      WS_URL = 'wss://pitchnestv1.onrender.com';
     }
 
     // Append JWT for server-side authentication on the WS connection.
