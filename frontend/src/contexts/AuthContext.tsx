@@ -23,6 +23,17 @@ export interface User {
   settings?: Record<string, any>;
   /** Paywall tier. Drives UI affordances only — the server re-checks every gate. */
   plan?: UserPlan;
+  /**
+   * Trial state. These mirror exactly what the backend's toPublicUser() returns
+   * (authController.ts) — they used to be missing from this interface, which is
+   * why call sites read them through `as any`. The SERVER derives both the plan
+   * and the trial from the row on every request, so these are a snapshot; never
+   * treat them as the authority for anything that matters.
+   */
+  planExpiresAt?: string | null;
+  isTrial?: boolean;
+  trialDaysRemaining?: number;
+  trialExpiresAt?: string | null;
   orgCode?: number | string;
   accountType?: "user" | "organization";
 }
@@ -206,8 +217,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string,
     password: string,
     role?: UserRole,
-    referralCode?:string
   ) => {
+    const referralCode = Cookies.get("code")?.trim();
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -216,7 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         role,
-        referralCode: Cookies.get("code") ?? " ",
+        ...(referralCode ? { referralCode } : {}),
       }),
     });
     const data = await res.json();

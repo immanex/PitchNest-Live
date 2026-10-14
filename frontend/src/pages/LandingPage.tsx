@@ -36,27 +36,39 @@ const roomFeatures = [
   { icon: FileText, title: "Deck-aware Q&A", desc: "Upload your deck and get slide-grounded questions on your TAM, unit economics, and GTM." },
   { icon: Zap, title: "Adaptive follow-ups", desc: "The panel reacts to what you actually say — no two sessions are the same." },
   { icon: Target, title: "Practice any room", desc: "Angel, seed VC, YC-style, PE, or Shark-Tank-style panels — tune the aggressiveness." },
-  { icon: PlayCircle, title: "Full replay", desc: "Every session is recorded so you can review exactly where you lost them." },
+  { icon: PlayCircle, title: "Replay the whole session", desc: "Every question the panel asked and every answer you gave, saved as a transcript you can read back in your pitch archive." },
 ];
 
-const reportItems = [
-  "Verdict + executive summary — invest, watch, or decline, and why, in plain language.",
-  "Readiness scorecard — an overall score broken down across delivery, clarity, scalability, and readiness.",
-  "Delivery analytics — filler-word %, talk ratio, confidence over time, and how many questions you fielded.",
-  "Strengths & critical risks — what landed, and the red flags that will sink you if you don't fix them.",
-  "Toughest questions + answer frameworks — the ones you fumbled, with a structure to nail them next time.",
-  "Competitive landscape & SWOT — AI-identified competitors and gaps to exploit (estimates labeled as such).",
-  "Prioritized action plan + practice drills — ranked fixes to run before your next session.",
-  "Progress tracking — scores saved across sessions so you can watch your readiness climb.",
-  "Shareable — send the read-only report to co-founders, advisors, or your accelerator.",
+/**
+ * What a PitchNest report contains, and WHERE each part appears.
+ *
+ * The split matters because the report is not one artefact. The on-screen report
+ * (pages/PostPitchReport.tsx) gives every plan the verdict, the score, the radar,
+ * sentiment, strengths and risks. The written PDF — a paid feature — is where the
+ * prescriptive material lives: the action plan, the questions to prepare answers
+ * for, the competitive landscape and SWOT, the practice drills, and the filler /
+ * talk-ratio measurements. Listing all of it as though it were on screen would
+ * overclaim for every free user, which is precisely what this list used to do.
+ */
+const reportItems: { text: string; pdfOnly?: boolean }[] = [
+  { text: "Verdict + executive summary — invest, watch, or decline, and why, in plain language." },
+  { text: "Readiness scorecard — an overall score broken down across delivery, clarity, scalability, and readiness." },
+  { text: "Delivery analytics — every question the panel put to you and how your confidence moved across the pitch." },
+  { text: "Strengths & critical risks — what landed, and the red flags that will sink you if you don't fix them." },
+  { text: "Prioritized action plan — ranked fixes to run before your next session.", pdfOnly: true },
+  { text: "Toughest questions + answer frameworks — the ones you fumbled, with a structure to nail them next time.", pdfOnly: true },
+  { text: "Competitive landscape & SWOT — AI-identified competitors and gaps to exploit (estimates labeled as such).", pdfOnly: true },
+  { text: "Practice drills — reps to run before you pitch again.", pdfOnly: true },
+  { text: "Filler words & talk ratio — measured from what you actually said.", pdfOnly: true },
+  { text: "Progress tracking — this attempt measured against your last one, so you can watch the readiness climb." },
 ];
 
-const reportTags = ["Delivery analytics", "Competitive SWOT", "Action plan", "Practice drills", "Shareable"];
+const reportTags = ["Readiness score", "Delivery analytics", "Strengths & risks", "Verdict & summary", "Downloadable PDF"];
 
 const whyItems = [
   { icon: ShieldCheck, title: "Safe to fail", desc: "Stumble on the hard questions here, not in front of a partner. No relationship burned." },
   { icon: TrendingUp, title: "Reps, not luck", desc: "Investors get one shot at you. Pro gives you unlimited shots at getting ready." },
-  { icon: Target, title: "A target to beat", desc: "Each report projects your score after the fixes — so every rep has a number to chase." },
+  { icon: Target, title: "A target to beat", desc: "Re-pitch and your report measures this attempt against the last one — so every rep has a number to beat." },
   { icon: Zap, title: "Feedback in minutes", desc: "Structured critique the moment you finish. No waiting, no guesswork." },
   { icon: FileText, title: "Deck-aware, not generic", desc: "It interrogates your business, not pitch clichés." },
   { icon: Sparkles, title: "Start free", desc: "Two full pitch sessions a week, no card. Upgrade when you want more." },
@@ -67,7 +79,7 @@ const faqs = [
   { q: "How realistic is the panel?", a: "It asks the kinds of pointed, adaptive questions real partners do, and debates your thesis out loud. It's practice — not a prediction of any investor's decision." },
   { q: "Can I upload my pitch deck?", a: "Yes. The panel reads it and asks questions grounded in your slides and numbers." },
   { q: "Does it judge how I look on camera?", a: "Not today. PitchNest analyzes your spoken pitch and your deck. Visual delivery analysis is on our roadmap." },
-  { q: "What do I get after a session?", a: "A detailed readiness report — verdict, scorecard, delivery analytics, competitive landscape and SWOT, a prioritized action plan with practice drills, and your projected score if you fix the gaps — plus a replay you can review and share." },
+  { q: "What do I get after a session?", a: "A readiness report on screen, on every plan: the verdict, the scorecard across delivery, clarity, scalability and readiness, every question the panel asked, and how your confidence moved across the pitch. The downloadable written report adds the prioritised action plan, the questions to prepare answers for, the competitive landscape and SWOT, and practice drills. Re-pitch and either report measures this attempt against your last one." },
   { q: "Is it free?", a: "There's a free plan: 2 pitch sessions a week, 10 minutes each, with your full report on screen. Pro adds unlimited sessions, longer pitch durations, live market research in the panel, and the downloadable PDF report." },
 ];
 
@@ -392,14 +404,19 @@ export default function LandingPage() {
             <div className="grid lg:grid-cols-5 gap-6 lg:gap-8 items-start">
               <SectionReveal className="lg:col-span-2">
                 <div className="card p-7 sm:p-8 lg:sticky lg:top-28">
-                  <p className="section-label mb-4 flex items-center gap-2"><TrendingUp size={14} /> If you pitched again today</p>
+                  {/* This card used to be headed "If you pitched again today" and
+                      claimed every report projects your score after the fixes.
+                      Nothing projected anything — the number was invented. What
+                      the product genuinely does is compare this attempt with the
+                      previous one, so the card now shows that instead. */}
+                  <p className="section-label mb-4 flex items-center gap-2"><TrendingUp size={14} /> Your second attempt</p>
                   <div className="flex items-end gap-3 mb-4">
                     <span className="font-display text-4xl sm:text-5xl font-bold text-slate-400 dark:text-zinc-600 line-through decoration-2">46</span>
                     <ArrowRight className="mb-2 text-slate-400 dark:text-zinc-500" size={26} />
                     <span className="font-display text-5xl sm:text-6xl font-bold gradient-text leading-none">78</span>
                   </div>
                   <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
-                    Every report projects your score once you fix the flagged gaps — so you know exactly what's on the table, and each rep has a number to chase.
+                    Re-pitch and the report sets this attempt beside your last one, so you can see whether the fixes landed. The panel walks in remembering what it flagged.
                   </p>
                   <div className="mt-6 pt-6 border-t border-slate-100 dark:border-zinc-800 flex flex-wrap gap-2">
                     {reportTags.map((t) => (
@@ -413,18 +430,27 @@ export default function LandingPage() {
 
               <SectionReveal delay={0.08} className="lg:col-span-3">
                 <div className="card p-7 sm:p-8">
-                  <h3 className="font-display text-lg font-semibold mb-5">What's inside every report</h3>
+                  <h3 className="font-display text-lg font-semibold mb-2">What's inside every report</h3>
+                  <p className="text-sm text-slate-500 dark:text-zinc-400 mb-5 leading-relaxed">
+                    The first four are on screen on every plan, including Free. The rest are in the
+                    downloadable written report.
+                  </p>
                   <ul className="space-y-4">
                     {reportItems.map((item) => {
-                      const idx = item.indexOf(' — ');
-                      const lead = idx === -1 ? item : item.slice(0, idx);
-                      const rest = idx === -1 ? '' : item.slice(idx + 3);
+                      const idx = item.text.indexOf(' — ');
+                      const lead = idx === -1 ? item.text : item.text.slice(0, idx);
+                      const rest = idx === -1 ? '' : item.text.slice(idx + 3);
                       return (
-                        <li key={item} className="flex gap-3">
+                        <li key={item.text} className="flex gap-3">
                           <CheckCircle2 size={18} className="shrink-0 mt-0.5 text-indigo-500 dark:text-indigo-400" />
                           <p className="text-sm text-slate-600 dark:text-zinc-300 leading-relaxed">
                             <span className="font-semibold text-slate-800 dark:text-zinc-100">{lead}</span>
                             {rest && <> — {rest}</>}
+                            {item.pdfOnly && (
+                              <span className="ml-2 align-middle inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400">
+                                PDF
+                              </span>
+                            )}
                           </p>
                         </li>
                       );

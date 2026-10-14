@@ -12,6 +12,8 @@ import {
   Download,
   Trash2,
   Share2,
+  Link2Off,
+  Globe,
   AlertCircle,
   Loader2,
   RotateCcw,
@@ -29,9 +31,29 @@ import { useAuth } from "../contexts/AuthContext";
 import { Skeleton } from "../components/Skeleton";
 import { LogoMark } from "../components/Logo";
 
+/**
+ * Copies the public link, or falls back to showing it if the clipboard is
+ * unavailable (insecure origin, denied permission, or Safari's activation
+ * window having closed while the share request was in flight). A share button
+ * that silently copies nothing is worse than no button at all — the founder
+ * walks away believing a link exists.
+ */
+async function copyShareUrl(url: string): Promise<void> {
+  const note =
+    "Anyone with this link sees the score, the strengths and the fixes — not the transcript, and not the rest of the report. Turn it off any time from the same menu.";
+  try {
+    await navigator.clipboard.writeText(url);
+    alert(`Public link copied.\n\n${url}\n\n${note}`);
+  } catch {
+    window.prompt("Copy your public link:", url);
+  }
+}
+
 const PitchRow = ({
   id,
   shareId,
+  shareEnabled,
+  shareBusy,
   name,
   date,
   duration,
@@ -44,11 +66,16 @@ const PitchRow = ({
   scoreDelta,
   onPitchAgain,
   onDelete,
+  onToggleShare,
   isSelected,
   onSelectToggle,
 }: {
   id: number;
   shareId?: string;
+  /** Server truth: this session is currently readable at /share/<share_id>. */
+  shareEnabled?: boolean;
+  /** A share request for this row is in flight — the menu item is disabled. */
+  shareBusy?: boolean;
   name: string;
   date: string;
   duration: string;
@@ -63,25 +90,12 @@ const PitchRow = ({
   scoreDelta: number | null;
   onPitchAgain: () => void;
   onDelete: (id: number) => void;
+  onToggleShare: () => void;
   isSelected: boolean;
   onSelectToggle: (id: number) => void;
   key?: React.Key;
 }) => {
   const isIncomplete = score === 0;
-
-  const handleShare = () => {
-    // Copies a link to YOUR OWN report, not a public share.
-    //
-    // /report sits inside ProtectedRoute, so a recipient without an account is
-    // bounced to login, and a signed-in stranger fails the ownership check and
-    // gets a 404. The previous copy said "Share link copied!", which promised
-    // something the app cannot do. A real public share needs an unauthenticated
-    // route backed by share_id — the backend half already exists in getSession.
-    const url = `${window.location.origin}/report?session=${id}`;
-    navigator.clipboard.writeText(url).then(() => {
-      alert("Link copied. Note: only you can open this — public sharing is coming soon.");
-    });
-  };
 
   return (
     <div className="group flex items-center gap-3 p-4 sm:p-6 bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl hover:border-sky-200 dark:hover:border-sky-500/50 hover:shadow-lg hover:shadow-sky-50 dark:hover:shadow-none transition-all">
@@ -132,6 +146,16 @@ const PitchRow = ({
             >
               {attemptsUsed} of {maxAttempts} attempts used
             </span>
+            {/*
+              A founder should never have to open a menu to discover that one of
+              their pitch reports is readable by anyone with the link. The badge
+              is the standing answer to "which of these are public?".
+            */}
+            {shareEnabled && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-sky-500/20 rounded-full text-[10px] font-bold uppercase tracking-widest bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                <Globe size={10} /> Link shared
+              </span>
+            )}
           </span>
         </div>
 
@@ -225,11 +249,30 @@ const PitchRow = ({
                   <Play size={14} /> View Replay
                 </Link>
               </DropdownMenu.Item>
+              {/*
+                Share is a toggle, not a one-shot. The first click publishes the
+                highlights and copies the link; the second takes it back down.
+                Publishing a report and then having no way to unpublish it would
+                be a trap, so the revoke path is the same menu item.
+              */}
               <DropdownMenu.Item
-                onSelect={handleShare}
-                className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer outline-none"
+                disabled={shareBusy || isIncomplete}
+                onSelect={shareBusy || isIncomplete ? undefined : onToggleShare}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 text-xs font-bold rounded-lg outline-none select-none",
+                  shareBusy || isIncomplete
+                    ? "text-slate-400 dark:text-zinc-600 opacity-40 cursor-default"
+                    : "text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer",
+                )}
               >
-                <Share2 size={14} /> Share Pitch
+                {shareBusy ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : shareEnabled ? (
+                  <Link2Off size={14} />
+                ) : (
+                  <Share2 size={14} />
+                )}
+                {isIncomplete ? "Share Pitch" : shareEnabled ? "Stop sharing" : "Share Pitch"}
               </DropdownMenu.Item>
               {/* Req 14: after the 5th attempt (or past the practice window) the
                   pitch is read/replay/report-only. The server's
@@ -348,6 +391,9 @@ export default function MyPitchesArchive() {
   const [modeFilter, setModeFilter] = useState<"all" | SessionMode>("all");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  // Which row has a share request in flight, so the menu item can spin and
+  // can't be double-clicked into two POSTs.
+  const [shareBusyId, setShareBusyId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -387,6 +433,65 @@ export default function MyPitchesArchive() {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
+  };
+
+  /**
+   * Publish or withdraw the public link for one session.
+   *
+   * The server owns both halves: POST /api/sessions/:id/share flips
+   * share_enabled on and returns the share id (reusing the one already on the
+   * row so a founder who re-shares gets back the same URL they already sent
+   * someone), DELETE flips it back off. Nothing here decides what a recipient
+   * sees — that projection is built server-side.
+   *
+   * Note the local state update: it reflects the server's answer rather than
+   * assuming the request worked, so a failed revoke leaves the badge on and the
+   * founder still knows the link is live.
+   */
+  const handleToggleShare = async (session: any) => {
+    const id = session.id;
+    setShareBusyId(id);
+    try {
+      if (session.share_enabled) {
+        // Revoking breaks a link someone may already have been sent, and it does
+        // it instantly. Ask first.
+        const confirmed = window.confirm(
+          "Turn off the public link?\n\nAnyone you have sent it to will stop being able to open it. The same link starts working again if you share this pitch later.",
+        );
+        if (!confirmed) return;
+
+        const res = await authFetch(`/api/sessions/${id}/share`, {
+          method: "DELETE",
+        });
+        if (!res.ok) throw new Error(`revoke failed (${res.status})`);
+        setSessions((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, share_enabled: false } : s)),
+        );
+        return;
+      }
+
+      const res = await authFetch(`/api/sessions/${id}/share`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(`share failed (${res.status})`);
+      const data = await res.json().catch(() => ({}));
+      const shareId = data?.shareId || session.share_id;
+      if (!shareId) throw new Error("no share id returned");
+
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === id ? { ...s, share_id: shareId, share_enabled: true } : s,
+        ),
+      );
+      // Composed client-side so the link matches the origin the founder is
+      // actually on — the server deliberately returns a bare id, not a URL.
+      await copyShareUrl(`${window.location.origin}/share/${shareId}`);
+    } catch (err) {
+      console.error("Share toggle failed:", err);
+      alert("Couldn't update the share link. Please try again.");
+    } finally {
+      setShareBusyId(null);
+    }
   };
 
   const filteredSessions = sessions.filter((session) => {
@@ -585,6 +690,8 @@ export default function MyPitchesArchive() {
                       key={session.id}
                       id={session.id}
                       shareId={session.share_id}
+                      shareEnabled={!!session.share_enabled}
+                      shareBusy={shareBusyId === session.id}
                       name={name}
                       date={date}
                       duration={duration}
@@ -601,6 +708,7 @@ export default function MyPitchesArchive() {
                         })
                       }
                       onDelete={handleDelete}
+                      onToggleShare={() => handleToggleShare(session)}
                       isSelected={selectedIds.includes(session.id)}
                       onSelectToggle={handleSelectToggle}
                     />

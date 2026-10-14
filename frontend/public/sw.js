@@ -1,8 +1,10 @@
-// Bumped to v4: the HTML shell (navigations + index.html) is now served
+// Bumped to v5: local development no longer registers this worker, and only
+// same-origin HTTP(S) requests are eligible for runtime caching.
+// The HTML shell (navigations + index.html) is served
 // NETWORK-FIRST so a fresh deploy shows up immediately instead of being masked
 // by a stale cached shell that points at old, content-hashed JS bundles. Other
 // static assets keep stale-while-revalidate (hashed bundles are safe to reuse).
-const CACHE_NAME = 'pitchnest-cache-v4';
+const CACHE_NAME = 'pitchnest-cache-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -10,8 +12,7 @@ const ASSETS_TO_CACHE = [
   '/logo.png',
   '/logo.svg',
   '/logo-maskable-192.png',
-  '/logo-maskable-512.png',
-  '/dashboard-mockup.png'
+  '/logo-maskable-512.png'
 ];
 
 // Install event: cache initial static shell
@@ -61,11 +62,13 @@ function isHtmlRequest(request) {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Bypass API requests, non-GET requests, Supabase database calls, and WebSocket connections
+  // Cache Storage only supports HTTP(S), and this worker should never cache
+  // extension requests, third-party assets, API calls, or WebSockets.
   if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    url.origin !== self.location.origin ||
     event.request.method !== 'GET' ||
     url.pathname.startsWith('/api') ||
-    url.hostname.includes('supabase') ||
     event.request.headers.get('Upgrade') === 'websocket'
   ) {
     return; // Let browser fetch naturally without intercepting
@@ -80,12 +83,22 @@ self.addEventListener('fetch', (event) => {
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
             const copy = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+            caches
+              .open(CACHE_NAME)
+              .then((cache) => cache.put(event.request, copy))
+              .catch((err) => console.warn('SW HTML cache update failed:', err));
           }
           return networkResponse;
         })
         .catch(() =>
-          caches.match(event.request).then((cached) => cached || caches.match('/index.html'))
+          caches.match(event.request).then(async (cached) => {
+            if (cached) return cached;
+            const shell = await caches.match('/index.html');
+            return shell || new Response('Offline', {
+              status: 503,
+              headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+            });
+          })
         )
     );
     return;
@@ -98,7 +111,10 @@ self.addEventListener('fetch', (event) => {
         // Fetch fresh version in the background
         fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
+            caches
+              .open(CACHE_NAME)
+              .then((cache) => cache.put(event.request, networkResponse))
+              .catch((err) => console.warn('SW background cache update failed:', err));
           }
         }).catch(() => {}); // Silence background errors if offline
         return cachedResponse;
@@ -109,12 +125,15 @@ self.addEventListener('fetch', (event) => {
         // Cache dynamic static files if successful
         if (response && response.status === 200 && response.type === 'basic') {
           const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+          caches
+            .open(CACHE_NAME)
+            .then((cache) => cache.put(event.request, responseToCache))
+            .catch((err) => console.warn('SW runtime cache update failed:', err));
         }
         return response;
       }).catch((err) => {
         console.error('SW fetch failed for:', url.href, err);
-        throw err;
+        return Response.error();
       });
     })
   );

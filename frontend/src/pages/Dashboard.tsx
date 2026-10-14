@@ -18,6 +18,7 @@ import { Skeleton } from "../components/Skeleton";
 import { useAuth } from "../contexts/AuthContext";
 import { LogoMark } from "../components/Logo";
 import { FirstTimeTour } from "../components/FirstTimeTour";
+import { TrialEndedNotice } from "../components/TrialEndedNotice";
 import { getSessionMode, MODE_LABELS } from "../lib/sessionMode";
 
 const DASHBOARD_TOUR_STEPS = [
@@ -365,6 +366,10 @@ export default function Dashboard() {
           <LogoMark className="w-32 h-32" />
         </div>
       </motion.div>
+
+      {/* Says what happened when the trial lapses. Renders nothing at any other
+          time — see the component for why it is a card and not a modal. */}
+      <TrialEndedNotice />
 
       {/* Dynamic Stats Overview */}
       <div

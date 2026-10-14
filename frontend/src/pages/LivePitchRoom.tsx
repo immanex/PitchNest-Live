@@ -76,6 +76,12 @@ const VAD_THRESHOLD_MULTIPLIER = 2.5; // speech must exceed 2.5× the noise floo
 const VAD_MIN_THRESHOLD = 0.04; // absolute floor so a silent room can't make VAD hair-trigger
 const VAD_SUSTAIN_FRAMES = 3; // ~190ms of sustained loudness before counting as speech
 const VAD_BARGE_IN_MS = 600; // sustained speech duration that confirms an intentional interruption
+// One PCM frame from pcm-processor.js holds 1024 samples at 16kHz. Speech time
+// is accumulated as a COUNT of loud frames times this, rather than by clocking
+// wall time between two timestamps: a burst of late frames then still measures
+// exactly the audio it represents, and a stall in the audio thread measures as
+// silence instead of inflating the turn.
+const PCM_FRAME_MS = 64;
 const TTS_STREAM_FLUSH_MS = 650;
 const TTS_STREAM_SPEAK_MIN_CHARS = 120;
 
@@ -931,6 +937,14 @@ export default function LivePitchRoom() {
       type: "user" | "ai";
       speaker?: string;
       inputMethod?: "voice" | "chat";
+      /**
+       * Seconds of speech the VAD measured for this turn, or absent when it was
+       * not measured (a typed answer, or a client that does not time audio).
+       * Travelling on the transcript is what lets the server compute speaking
+       * pace from real timing instead of leaving it permanently unknown — see
+       * backend/src/utils/deliveryMetrics.ts.
+       */
+      speakSeconds?: number;
     }[]
   >(() => {
     const rec = readResumeRecord();
@@ -1218,6 +1232,15 @@ export default function LivePitchRoom() {
   // only call setState on transitions, not on every audio frame.
   const lastLoudFrameRef = useRef(0);
   const userSpeakingUiRef = useRef(false);
+  // Speech time the VAD has measured for the founder turn currently being
+  // transcribed, in milliseconds. Reset each time a turn is stamped onto a
+  // message, so each message carries the speech that produced it.
+  //
+  // This is the ONLY source of speaking-pace data in the product. It is a
+  // measurement, not an estimate — and when it is absent the pace is reported as
+  // unmeasured rather than guessed, because a founder can disprove a wrong
+  // number about their own speech and one such number discredits the report.
+  const turnSpeechMsRef = useRef(0);
   // ──────────────────────────────────────────────────────────────────────
 
   // ── Keep the screen awake while in the live pitch room ──────────────────
@@ -1707,6 +1730,10 @@ export default function LivePitchRoom() {
         // single spike (cough, door slam) can't trigger a false barge-in.
         if (rms > vadThresholdRef.current && !isMicMuted) {
           vadLoudFrameCountRef.current++;
+          // Speaking-pace accounting. Uses the same loudness test that drives
+          // barge-in, including the mute guard: a muted microphone is not
+          // sending audio, so it is not speech time.
+          turnSpeechMsRef.current += PCM_FRAME_MS;
         } else {
           vadLoudFrameCountRef.current = 0;
         }
@@ -1856,6 +1883,16 @@ export default function LivePitchRoom() {
         if (!finalPayload) return;
 
         console.log("✅ Voice transcript:", finalPayload);
+        // Hand this turn the speech time the VAD measured for it, then reset so
+        // the next utterance starts from zero. Rounded to 0.1s. Undefined — not
+        // zero — when nothing was measured, so the server can tell "the founder
+        // was silent" apart from "this client does not report timing", and only
+        // the former is a fact about the founder.
+        const speakSeconds =
+          turnSpeechMsRef.current > 0
+            ? Math.round(turnSpeechMsRef.current / 100) / 10
+            : undefined;
+        turnSpeechMsRef.current = 0;
         setMessages((prev) => [
           ...prev,
           {
@@ -1864,6 +1901,7 @@ export default function LivePitchRoom() {
             type: "user",
             speaker: userData.name,
             inputMethod: "voice",
+            speakSeconds,
           },
         ]);
         // Note: Raw audio is already being sent via the PCM pipeline above.

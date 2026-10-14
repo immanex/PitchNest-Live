@@ -1,0 +1,29 @@
+# Crawl everything public, but keep two things out of search results entirely.
+
+User-agent: *
+Allow: /
+
+# Shared pitch reports (/share/<uuid>) are unlisted and revocable — the owner can
+# switch the link off at any time, and a founder's readiness score turning up in
+# Google results under their company name is not a thing we ever want to explain.
+# Notes:
+#   • robots.txt only stops well-behaved crawlers, so the page also sends
+#     `X-Robots-Tag: noindex, nofollow` on the API response and injects a
+#     <meta name="robots"> tag while it is mounted. This file is the cheap first
+#     line, not the only one.
+#   • Never Disallow a URL whose pages you also want de-indexed-but-followed:
+#     blocking the crawl means the noindex tag is never seen. Both mechanisms are
+#     in place here, so either alone is enough.
+Disallow: /share/
+
+# Signed-in surfaces. They redirect to /login for anyone without a session, so
+# blocking them just spares the crawler a wasted request.
+Disallow: /dashboard
+Disallow: /setup
+Disallow: /report
+Disallow: /replay
+Disallow: /pitches
+Disallow: /settings
+Disallow: /organization
+Disallow: /organization-login
+Disallow: /reset-password

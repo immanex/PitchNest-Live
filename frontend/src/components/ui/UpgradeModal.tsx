@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useMemo, useState } from
 import * as Dialog from "@radix-ui/react-dialog";
 import { Sparkles, Check, X, Loader2 } from "lucide-react";
 import { useBilling } from "../../contexts/BillingContext";
+import { CONTACT_EMAIL } from "../../lib/legal";
 
 /**
  * The single upgrade prompt for the whole app.
@@ -32,7 +33,18 @@ export function useUpgrade() {
   return useContext(UpgradeContext);
 }
 
-/** Headline and lead copy per trigger, so the prompt answers what was clicked. */
+/**
+ * Headline and lead copy per trigger, so the prompt answers what was clicked.
+ *
+ * Every claim in here has to survive comparison with what the billing backend
+ * will actually grant once the payment clears. This modal sells Pro, so the
+ * honest delta against Free is exactly five things: unlimited sessions instead
+ * of two a week, sessions up to 40 minutes instead of 10, the downloadable PDF,
+ * the prescriptive half of the report (next steps + reading the room), and live
+ * market research. Personas and the multi-VC panel were previously listed as
+ * upgrade benefits — they are available on Free, so listing them misrepresented
+ * what the money buys.
+ */
 const COPY: Record<UpgradeReason, { title: string; lead: string }> = {
   duration: {
     title: "Longer sessions are a Pro feature",
@@ -44,19 +56,20 @@ const COPY: Record<UpgradeReason, { title: string; lead: string }> = {
   },
   pdf: {
     title: "The full report is a Pro feature",
-    lead: "Your scores stay on screen for free. Upgrade to download the complete written report and share it.",
+    lead: "Your score, radar and risks stay on screen on every plan. Pro adds the downloadable PDF and the written action plan.",
   },
   generic: {
     title: "Upgrade to Pro",
-    lead: "Get unlimited pitches, longer sessions and the full downloadable report.",
+    lead: "Unlimited sessions, longer pitch durations, the downloadable PDF report, your prioritised next steps, and live market research in the panel.",
   },
 };
 
 const BENEFITS = [
-  "Unlimited live practice / mo (Founder & Pro)",
-  "All AI investor personas + Multi-VC panel",
-  "Full downloadable PDF report & shareable links",
-  "Grilling sessions & live market research in panel",
+  "Unlimited sessions (Free gives you 2 a week)",
+  "Sessions up to 40 minutes (Free is 10)",
+  "Downloadable PDF of the full written report",
+  "Your prioritised next steps and room-read feedback",
+  "Live market research woven into the panel",
 ];
 
 export const UpgradeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -65,9 +78,11 @@ export const UpgradeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [starting, setStarting] = useState(false);
   const { info, upgrade } = useBilling();
 
-  const priceLabel = info.price
-    ? `$${info.price.amount}/mo`
-    : "$15/mo";
+  // No hardcoded fallback amount. If the server catalogue hasn't answered yet,
+  // the button drops the price and just says "Upgrade to Pro" — naming a figure
+  // the checkout might not match is worse than naming none. The checkout page
+  // states the real amount before any money moves.
+  const priceLabel = info.price ? `$${info.price.amount}/mo` : "";
 
   const showUpgrade = useCallback((r: UpgradeReason = "generic") => {
     setReason(r);
@@ -141,9 +156,13 @@ export const UpgradeProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 </button>
               ) : (
                 /* Billing keys aren't configured, so there is no checkout to
-                   send anyone to. A mail link is honest; a dead button is not. */
+                   send anyone to. A mail link is honest; a dead button is not.
+                   Address comes from lib/legal.ts, the same one the terms,
+                   privacy and support pages publish — the previous
+                   "surpport@pitchnest.app" was a typo'd address on a domain with
+                   no inbound mailbox, so these upgrades went nowhere. */
                 <a
-                  href="mailto:surpport@pitchnest.app?subject=Upgrade%20to%20PitchNest%20Pro"
+                  href={`mailto:${CONTACT_EMAIL}?subject=Upgrade%20to%20PitchNest%20Pro`}
                   className="flex flex-1 items-center justify-center rounded-xl bg-sky-500 py-3 text-sm font-bold text-white transition-colors hover:bg-sky-600"
                 >
                   Contact us to upgrade

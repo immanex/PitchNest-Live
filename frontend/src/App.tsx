@@ -29,6 +29,10 @@ import TermsOfService from "./pages/legal/TermsOfService";
 import DeleteAccount from "./pages/legal/DeleteAccount";
 import Support from "./pages/legal/Support";
 import PricingPage from "./pages/PricingPage";
+// Public, unauthenticated: a founder's shared pitch report, addressed by a
+// revocable share id. Deliberately outside ProtectedRoute — the recipient is an
+// investor or an accelerator who may not have an account and should not need one.
+import PublicPitch from "./pages/PublicPitch";
 import { SocketProvider } from "./contexts/SocketContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -61,6 +65,9 @@ export default function App() {
             <Route path="/delete-account" element={<DeleteAccount />} />
             <Route path="/support" element={<Support />} />
             <Route path="/pricing" element={<PricingPage />} />
+            {/* Shared pitch report — see pages/PublicPitch.tsx. Must be declared
+                above the "*" catch-all below or it would redirect to "/". */}
+            <Route path="/share/:shareId" element={<PublicPitch />} />
              <Route path="/organization" element={<OrganizationDashboard />} />
 
             {/* Protected Routes (Wrapped in AppLayout with Sidebar) */}

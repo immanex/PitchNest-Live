@@ -5,6 +5,7 @@ import {
   Shield,
   CreditCard,
   Bell,
+  Mic,
   Lock,
   Edit3,
   LogOut,
@@ -22,6 +23,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { useBilling } from '../contexts/BillingContext';
 import { formatPrice } from '../lib/plans';
 import { planLabel } from '../lib/entitlements';
+import { CONTACT_EMAIL } from '../lib/legal';
+import {
+  DEFAULT_STT_LOCALE,
+  TRANSCRIPTION_LOCALES,
+  isSupportedSttLocale,
+  sttLocaleLabel,
+} from '../lib/transcriptionLocales';
 
 // --- Subcomponents ---
 const SettingSection = ({ title, children }: { title: string, children: React.ReactNode }) => (
@@ -51,7 +59,7 @@ export default function SettingsPage() {
    * anywhere in the app can land the user on the right panel. Unknown values
    * fall back to profile rather than rendering an empty page.
    */
-  const TAB_IDS = ["profile", "account", "subscription", "notifications"] as const;
+  const TAB_IDS = ["profile", "account", "subscription", "notifications", "voice"] as const;
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab") ?? "";
   const [activeTab, setActiveTabState] = useState<string>(
@@ -80,16 +88,19 @@ export default function SettingsPage() {
   const [selTerm, setSelTerm] = useState<"monthly" | "annual">("monthly");
   const [startingCheckout, setStartingCheckout] = useState(false);
   // The real Pro price, from the server (config-driven). Never hardcode it —
-  // that is exactly what produced the "$0/mo" bug.
-  const proPriceLabel = billing.price
-    ? formatPrice(billing.price.amount, billing.price.currency, billing.price.days)
-    : 'See pricing';
+  // that is exactly what produced the "$0/mo" bug. formatPrice returns "" when
+  // the server sent nothing usable, so the empty string falls through too.
+  const proPriceLabel =
+    (billing.price
+      ? formatPrice(billing.price.amount, billing.price.currency, billing.price.days)
+      : '') || 'See pricing';
   // Price for the SKU the user is currently choosing, from the server catalog.
   const selectedSku =
     billing.catalog.find((c) => c.plan === selPlan && c.term === selTerm) || null;
-  const selectedPriceLabel = selectedSku
-    ? formatPrice(selectedSku.amount, selectedSku.currency, selectedSku.days)
-    : 'See pricing';
+  const selectedPriceLabel =
+    (selectedSku
+      ? formatPrice(selectedSku.amount, selectedSku.currency, selectedSku.days)
+      : '') || 'See pricing';
   const handleUpgrade = async () => {
     setStartingCheckout(true);
     // On success the browser is redirected to the hosted page, so we only clear
@@ -102,6 +113,12 @@ export default function SettingsPage() {
     weeklyReport: false,
     investorInquiries: true
   });
+
+  // Recognition language for live sessions. `null` means "no preference" — we
+  // then show the server default but never write it, so a later change to the
+  // default reaches everyone who never actively chose.
+  const [sttLocale, setSttLocale] = useState<string | null>(null);
+  const effectiveSttLocale = sttLocale ?? DEFAULT_STT_LOCALE;
 
   const ROLE_OPTIONS = ["Founder", "Investor", "Advisor"] as const;
   type Role = (typeof ROLE_OPTIONS)[number];
@@ -145,6 +162,9 @@ export default function SettingsPage() {
           if (s.notifications && typeof s.notifications === "object") {
             setNotifications(prev => ({ ...prev, ...s.notifications }));
           }
+          // Only adopt a locale the server would accept; anything else stays
+          // "no preference" rather than rendering a value that cannot be saved.
+          if (isSupportedSttLocale(s.sttLocale)) setSttLocale(s.sttLocale);
         }
       } catch (e) { }
     }
@@ -307,6 +327,7 @@ export default function SettingsPage() {
             { id: "account", label: "Account", icon: Shield },
             { id: "subscription", label: "Subscription", icon: CreditCard },
             { id: "notifications", label: "Notifications", icon: Bell },
+            { id: "voice", label: "Voice & Language", icon: Mic },
           ].map((tab) => (
             <Tabs.Trigger
               key={tab.id}
@@ -598,8 +619,8 @@ export default function SettingsPage() {
               <div className="space-y-5">
                 {currentPlan === 'prep' && (
                   <p className="text-sm text-slate-600 dark:text-zinc-400">
-                    You're on Prep. Renew below, or move up to Pro for unlimited
-                    sessions and live market research.
+                    You're on the Founder plan. Renew below, or move up to Pro Founder
+                    for unlimited sessions, live market research and longer pitch durations.
                   </p>
                 )}
 
@@ -619,7 +640,7 @@ export default function SettingsPage() {
                           }`}
                       >
                         <span className="block text-sm font-extrabold text-slate-900 dark:text-zinc-100">
-                          {p === 'pro' ? 'Pro' : 'Prep'}
+                          {p === 'pro' ? 'Pro Founder' : 'Founder'}
                         </span>
                         <span className="block text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
                           {p === 'pro' ? 'For an active raise' : 'Sharpen up first'}
@@ -650,25 +671,28 @@ export default function SettingsPage() {
                   })}
                 </div>
 
-                {/* What the chosen plan includes */}
+                {/* What the chosen plan includes.
+                    Deck Check audits were listed here on both tiers. The backend
+                    for them exists, but /deck-check is routed to a redirect and
+                    the nav item is flagged comingSoon, so no customer can reach
+                    it — and there is no monthly cap implemented anywhere, only a
+                    rate limiter. Removed until the page is actually reachable. */}
                 <div className="p-4 border border-slate-200 dark:border-zinc-800 rounded-2xl bg-slate-50/50 dark:bg-zinc-800/30">
                   <p className="text-sm font-bold text-slate-800 dark:text-zinc-200 mb-3">
-                    {selPlan === 'pro' ? 'Pro' : 'Prep'} includes
+                    {selPlan === 'pro' ? 'Pro Founder' : 'Founder'} includes
                   </p>
                   <ul className="space-y-2">
                     {(selPlan === 'pro'
                       ? [
                         'Unlimited pitch sessions',
-                        'Longer sessions, up to 40 minutes',
+                        'Sessions up to 40 minutes',
                         'Full downloadable PDF report',
                         'Live market research in your panel',
-                        'Unlimited Deck Check audits',
                       ]
                       : [
                         'Unlimited pitch sessions',
-                        '20-minute sessions',
+                        'Sessions up to 20 minutes',
                         'Full downloadable PDF report',
-                        '5 Deck Check audits per month',
                       ]
                     ).map((b) => (
                       <li key={b} className="flex items-center gap-2.5 text-sm text-slate-600 dark:text-zinc-400">
@@ -688,13 +712,15 @@ export default function SettingsPage() {
                   >
                     {startingCheckout
                       ? 'Starting…'
-                      : `${currentPlan === 'prep' && selPlan === 'prep' ? 'Renew' : 'Upgrade to'} ${selPlan === 'pro' ? 'Pro' : 'Prep'} — ${selectedPriceLabel}`}
+                      : `${currentPlan === 'prep' && selPlan === 'prep' ? 'Renew' : 'Upgrade to'} ${selPlan === 'pro' ? 'Pro Founder' : 'Founder'} — ${selectedPriceLabel}`}
                   </button>
                 ) : (
                   /* Billing keys aren't configured — a mail link is honest, a dead
-                     button is not. Mirrors the UpgradeModal fallback. */
+                     button is not. Mirrors the UpgradeModal fallback, including
+                     the address: the old "surpport@pitchnest.app" was a typo on a
+                     domain with no inbound mailbox. */
                   <a
-                    href="mailto:surpport@pitchnest.app?subject=Upgrade%20my%20PitchNest%20plan"
+                    href={`mailto:${CONTACT_EMAIL}?subject=Upgrade%20my%20PitchNest%20plan`}
                     className="inline-flex w-full sm:w-auto items-center justify-center px-6 py-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-sm font-bold transition-colors"
                   >
                     Contact us to upgrade
@@ -760,6 +786,55 @@ export default function SettingsPage() {
                 </Switch.Root>
               </SettingItem>
             </div>
+          </Tabs.Content>
+
+          {/* VOICE & LANGUAGE TAB */}
+          <Tabs.Content value="voice" className="space-y-10 outline-none">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-zinc-100">Voice &amp; Language</h2>
+
+            <SettingSection title="Transcription">
+              <p className="text-sm text-slate-500 dark:text-zinc-500 -mt-2">
+                Your spoken pitch is transcribed before the panel hears it, and that transcript is
+                what gets scored. Telling us which English you actually speak is the single most
+                useful thing on this page — a mis-heard figure is a mis-scored answer.
+              </p>
+
+              <SettingItem
+                label="Recognition language"
+                description="Applies to live voice sessions. Typed pitches are unaffected."
+              >
+                <select
+                  aria-label="Recognition language"
+                  value={effectiveSttLocale}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (!isSupportedSttLocale(next)) return;
+                    setSttLocale(next);
+                    persistSettings({ sttLocale: next });
+                  }}
+                  className="px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20 min-w-56"
+                >
+                  {TRANSCRIPTION_LOCALES.map((l) => (
+                    <option key={l.code} value={l.code}>{l.label}</option>
+                  ))}
+                </select>
+              </SettingItem>
+
+              <p className="text-xs text-slate-400 dark:text-zinc-500">
+                Recognising as <span className="font-semibold text-slate-600 dark:text-zinc-300">{sttLocaleLabel(effectiveSttLocale)}</span>
+                {sttLocale ? ' — your saved preference.' : ' — the default, since you have not changed it.'}
+              </p>
+            </SettingSection>
+
+            <SettingSection title="Pitch vocabulary">
+              <p className="text-sm text-slate-500 dark:text-zinc-500 -mt-2">
+                Every session is biased toward the words founders and investors actually use —
+                metrics like TAM, CAC and LTV, terms like pre-seed and cap table, and African market
+                names like Lagos, naira and M-Pesa. Left to itself a speech model hears those as
+                ordinary English words, so "CAC" arrives as "cake" and a real number quietly
+                disappears from your answer. This is always on and needs no configuration.
+              </p>
+            </SettingSection>
           </Tabs.Content>
 
         </div>

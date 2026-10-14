@@ -15,12 +15,19 @@ PitchNest-Live/
 │   │   ├── 0005_add_login_lockout.sql
 │   │   ├── 0006_private_media_bucket.sql
 │   │   ├── 0008_add_plans_and_usage_ledger.sql
-│   │   ├── 0009_flutterwave_....sql           # Full name cut off in screenshot
-│   │   ├── 0010_paid_tiers_....sql            # Full name cut off in screenshot
+│   │   ├── 0009_flutterwave_billing.sql
+│   │   ├── 0010_paid_tiers_and_terms.sql
 │   │   ├── 0011_free_trial_and_plans.sql
 │   │   ├── 0012_verification_hardening.sql
 │   │   ├── 0013_pitch_attempts.sql
-│   │   └── 0014_deck_page_count.sql
+│   │   ├── 0014_deck_page_count.sql
+│   │   ├── 0015_session_sharing.sql            # Public share_id links (noindex, highlights only)
+│   │   ├── 0016_trial_email_log.sql            # Trial-ending email dedupe (server-only, RLS denies anon)
+│   │   └── 0017_founder_profiles.sql           # Cross-session founder memory (server-only, RLS denies anon)
+│   │
+│   │   # NOTE: these are applied MANUALLY — there is no migration runner.
+│   │   # A migration that has not been run in an environment fails soft:
+│   │   # the feature stays dormant and the server logs a warning.
 │   │
 │   ├── scripts/
 │   │   ├── check-overlaps.ts
@@ -63,6 +70,7 @@ PitchNest-Live/
 │   │   │   ├── deckTextService.ts
 │   │   │   ├── entitlementService.ts
 │   │   │   ├── flutterwaveService.ts
+│   │   │   ├── founderMemoryService.ts     # Cross-session founder memory (pure; no I/O)
 │   │   │   ├── pdfService.ts
 │   │   │   ├── pitchAttemptService.ts
 │   │   │   ├── pitchMemoryService.ts
@@ -81,7 +89,9 @@ PitchNest-Live/
 │   │   ├── utils/
 │   │   │   ├── aiTextSanitizer.ts
 │   │   │   ├── conversationWindow.ts
+│   │   │   ├── deliveryMetrics.ts           # Filler rate / talk ratio / pace (PDF + founder memory)
 │   │   │   ├── floorControl.ts
+│   │   │   ├── scoring.ts                   # Report → score, delegates to aiService.computeOverallScore
 │   │   │   ├── sendVerificationEmail.ts
 │   │   │   └── storagePath.ts
 │   │   │

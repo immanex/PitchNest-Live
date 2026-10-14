@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, Minus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Hammer, Minus, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LogoLink } from "../components/Logo";
-import { getPlans } from "../lib/plans";
+import { getPlans, IN_DEVELOPMENT } from "../lib/plans";
 import { usePublicPrice } from "../hooks/usePublicPrice";
 
 /**
@@ -18,25 +18,45 @@ import { usePublicPrice } from "../hooks/usePublicPrice";
  * the full plan comparison without an account.
  */
 
-/** Rows are explicit rather than derived so the matrix reads like a spec. */
+/**
+ * Rows are explicit rather than derived so the matrix reads like a spec.
+ *
+ * Every row is verified against what the product actually does today:
+ * backend/src/services/entitlementService.ts for the four plan-level gates
+ * (weekly session count, session length, the PDF, live market research), and the
+ * paywall boundary in pages/PostPitchReport.tsx for the fifth.
+ *
+ * THE FIFTH DELTA IS EASY TO MISS. On the report, everything down to the score
+ * radar, sentiment, strengths and risks is readable on every plan. The
+ * prescriptive half — "Reading the Room" and "Actionable Next Steps" — is blurred
+ * for anyone without live research, i.e. for Free AND for a paying Founder. So
+ * that row is Pro-only, and the score row above it is genuinely open to all.
+ * An earlier version of this table claimed prioritised fixes were included
+ * everywhere, which was simply not what the screen showed.
+ *
+ * That is a deliberate correction, not the only one. The matrix previously sold
+ * "2 Personas" on Free against "3" on Founder and held the multi-VC panel back for
+ * Pro, while nothing in the code gated either one; and the "Basic" vs "Detailed"
+ * score split was fiction. Rows for unbuilt features are gone from this table
+ * entirely and live in the roadmap section below, where they are not printed in
+ * the same column as a price.
+ */
 type Cellv = string | boolean;
 const MATRIX: { label: string; free: Cellv; founder: Cellv; pro: Cellv; enterprise: Cellv }[] = [
-  { label: "Practice pitch time", free: "2 × 10 min / week", founder: "Unlimited", pro: "Unlimited", enterprise: "Unlimited" },
-  { label: "AI investor personas", free: "2 Personas", founder: "3 Personas", pro: "All Personas + Multi-VC", enterprise: "All Personas" },
-  { label: "Grilling Session / Rapid Q&A", free: false, founder: true, pro: true, enterprise: true },
-  { label: "Multi-VC panel simulation", free: false, founder: false, pro: true, enterprise: true },
-  { label: "Multilingual AI VCs", free: false, founder: false, pro: "Coming Soon", enterprise: "Coming Soon" },
-  { label: "Readiness score & actionable fixes", free: "Basic", founder: "Detailed", pro: "Detailed + Analytics", enterprise: "Cohort Analytics" },
+  { label: "Practice sessions", free: "2 / week", founder: "Unlimited", pro: "Unlimited", enterprise: "Unlimited" },
+  { label: "Session length", free: "10 min", founder: "10–20 min", pro: "10–40 min", enterprise: "10–40 min" },
+  { label: "AI investor personas", free: "All 10", founder: "All 10", pro: "All 10", enterprise: "All 10" },
+  { label: "Multi-VC panel simulation", free: true, founder: true, pro: true, enterprise: true },
+  { label: "1-on-1 coach mode", free: true, founder: true, pro: true, enterprise: true },
   { label: "Deck-aware questioning", free: true, founder: true, pro: true, enterprise: true },
-  { label: "Downloadable PDF report & share link", free: "Unlocked in Trial", founder: true, pro: true, enterprise: true },
+  { label: "Readiness score, radar, strengths & risks", free: true, founder: true, pro: true, enterprise: true },
+  { label: "Downloadable PDF report", free: "Trial only", founder: true, pro: true, enterprise: true },
+  { label: "Prioritised next steps & reading the room", free: false, founder: false, pro: true, enterprise: true },
   { label: "Live market research in panel", free: false, founder: false, pro: true, enterprise: true },
-  { label: "AI Script generation", free: "Basic (Soon)", founder: "Unlimited (Soon)", pro: "Unlimited (Soon)", enterprise: "Unlimited (Soon)" },
-  { label: "AI Virtual Co-Founder", free: false, founder: false, pro: "Coming Soon", enterprise: "Coming Soon" },
-  { label: "AI-generated pitch decks", free: false, founder: false, pro: "10 Decks (Soon)", enterprise: "Unlimited (Soon)" },
-  { label: "Cohort dashboard & seats", free: false, founder: false, pro: false, enterprise: true },
-  { label: "Branded PDF reports", free: false, founder: false, pro: false, enterprise: true },
-  { label: "Direct VC intro pathway", free: false, founder: false, pro: false, enterprise: "Coming Soon" },
-  { label: "Investment programs access", free: "Coming Soon", founder: "Priority (Soon)", pro: "Priority (Soon)", enterprise: "Partner Pathway" },
+  { label: "Organisation account & cohort seats", free: false, founder: false, pro: false, enterprise: true },
+  { label: "Cohort dashboard & founder drill-down", free: false, founder: false, pro: false, enterprise: true },
+  { label: "Weekly & monthly cohort reports", free: false, founder: false, pro: false, enterprise: true },
+  { label: "Enrolment link & QR for your founders", free: false, founder: false, pro: false, enterprise: true },
 ];
 
 function Cell({ value }: { value: string | boolean }) {
@@ -49,15 +69,19 @@ export default function PricingPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const publicPrice = usePublicPrice();
   const plans = useMemo(() => getPlans(publicPrice), [publicPrice]);
-  // Per-tier monthly prices from the server catalog (fallback to deck values
-  // until the price loads), so cards + matrix never show a number that differs
-  // from what checkout charges.
+  // Per-tier monthly prices, straight from the server catalog. When the catalog
+  // has not answered, these are null and the page shows a neutral "—" rather
+  // than a hardcoded amount that could disagree with what checkout charges.
   const founderAmt =
-    publicPrice.catalog.find((c) => c.plan === "prep" && c.term === "monthly")?.amount ?? 9.99;
+    publicPrice.catalog.find((c) => c.plan === "prep" && c.term === "monthly")?.amount ?? null;
   const proAmt =
     publicPrice.catalog.find((c) => c.plan === "pro" && c.term === "monthly")?.amount ??
     publicPrice.amount ??
-    15;
+    null;
+  /** "$9.99" or "—". Never a number the server did not send. */
+  const money = (n: number | null) => (n === null ? "—" : `$${n}`);
+  /** "Founder ($9.99)", or just "Founder" while the price is unknown. */
+  const tier = (name: string, n: number | null) => (n === null ? name : `${name} ($${n})`);
 
   useEffect(() => {
     if (localStorage.getItem("user")) setIsLoggedIn(true);
@@ -131,13 +155,13 @@ export default function PricingPage() {
                     </>
                   ) : plan.id === "founder" ? (
                     <>
-                      <span className="text-3xl font-extrabold text-amber-600 dark:text-amber-500">{`$${founderAmt}`}</span>
-                      <span className={cn("text-xs font-medium", isPro ? "text-slate-300" : "text-slate-500 dark:text-zinc-400")}>/mo</span>
+                      <span className="text-3xl font-extrabold text-amber-600 dark:text-amber-500">{money(founderAmt)}</span>
+                      {founderAmt !== null && <span className={cn("text-xs font-medium", isPro ? "text-slate-300" : "text-slate-500 dark:text-zinc-400")}>/mo</span>}
                     </>
                   ) : plan.id === "pro" ? (
                     <>
-                      <span className="text-3xl font-extrabold text-[#F59E0B]">{`$${proAmt}`}</span>
-                      <span className="text-xs font-medium text-slate-300">/mo</span>
+                      <span className="text-3xl font-extrabold text-[#F59E0B]">{money(proAmt)}</span>
+                      {proAmt !== null && <span className="text-xs font-medium text-slate-300">/mo</span>}
                     </>
                   ) : (
                     <>
@@ -200,8 +224,8 @@ export default function PricingPage() {
               <tr className="bg-slate-50 dark:bg-zinc-900/60 border-b border-slate-200 dark:border-zinc-800">
                 <th scope="col" className="text-left font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-4 py-3">Feature</th>
                 <th scope="col" className="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-4 py-3 w-28">Free ($0)</th>
-                <th scope="col" className="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-4 py-3 w-28">{`Founder ($${founderAmt})`}</th>
-                <th scope="col" className="font-bold text-xs uppercase tracking-wider text-amber-600 dark:text-amber-400 px-4 py-3 w-32">{`Pro Founder ($${proAmt})`}</th>
+                <th scope="col" className="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-4 py-3 w-28">{tier("Founder", founderAmt)}</th>
+                <th scope="col" className="font-bold text-xs uppercase tracking-wider text-amber-600 dark:text-amber-400 px-4 py-3 w-32">{tier("Pro Founder", proAmt)}</th>
                 <th scope="col" className="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-4 py-3 w-32">Hubs & Accelerators</th>
               </tr>
             </thead>
@@ -226,8 +250,37 @@ export default function PricingPage() {
         </div>
 
         <p className="text-xs text-slate-400 dark:text-zinc-500 mt-4">
-          All features and PDF reports are currently unlocked for testing under the 30-Day Free Access period. Hubs & Accelerators is priced custom per seat or cohort. Features marked (Soon) are actively rolling out.
+          New accounts get 30 days of full Pro access, so every row above reads as included while you trial.
+          When it ends you keep the Free plan and every report you already generated stays readable — you
+          just stop being able to start new sessions beyond two a week. Hubs & Accelerators is priced custom
+          per seat or cohort.
         </p>
+
+        {/* Roadmap — deliberately OUTSIDE the comparison table, so nothing here
+            sits in a column next to a price. */}
+        <section className="mt-8 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 p-6 sm:p-7">
+          <div className="flex items-center gap-2 mb-2">
+            <Hammer size={15} className="text-slate-400 dark:text-zinc-500" />
+            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+              In development — not included in any plan
+            </h2>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mb-5 max-w-2xl">
+            None of this is built yet, none of it is purchasable, and nothing on this page charges you for it.
+            It is here because a roadmap is more useful than a mystery.
+          </p>
+          <ul className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
+            {IN_DEVELOPMENT.map((f) => (
+              <li key={f.label} className="flex items-start gap-2.5">
+                <Sparkles size={14} className="shrink-0 mt-0.5 text-slate-300 dark:text-zinc-600" />
+                <div>
+                  <p className="text-xs font-bold text-slate-700 dark:text-zinc-300">{f.label}</p>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">{f.blurb}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <div className="mt-12 rounded-2xl gradient-brand p-8 text-center text-white relative overflow-hidden">
           <div className="relative z-10 max-w-xl mx-auto">
