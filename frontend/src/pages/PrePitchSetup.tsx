@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { FirstTimeTour } from '../components/FirstTimeTour';
 import {
   Users, Target, User, Upload, FileText, Camera, Mic, CheckCircle2,
-  PlayCircle, Clock, Loader2, Monitor, Briefcase, AlignLeft, X, Lock
+  PlayCircle, Clock, Loader2, Monitor, Briefcase, AlignLeft, X, Lock,
+  Building2, MessageSquareQuote, ShieldCheck
 } from 'lucide-react';
+import { listBusinesses, type Business } from '../api/businesses';
+import { trackEvent } from '../lib/analytics';
+import {
+  createPracticeDraft,
+  getPracticeDraft,
+  PRACTICE_QUESTION_MAX,
+} from '../api/practice';
 import * as Switch from '@radix-ui/react-switch';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,6 +31,40 @@ import { useScreenCapture } from '../hooks/useScreenCapture';
  */
 const DURATION_OPTIONS = [10, 20, 30, 40] as const;
 const FREE_DURATION = 10;
+
+const INDUSTRY_OPTIONS = [
+  'SaaS & Enterprise',
+  'Fintech',
+  'Healthtech',
+  'Consumer Social & Media',
+  'E-commerce & Retail',
+  'Artificial Intelligence & ML',
+  'CleanTech & Sustainability',
+  'Biotech & Life Sciences',
+  'DeepTech & Aerospace',
+  'EdTech',
+  'Crypto & Web3',
+  'Hardware / IoT',
+  'Logistics & PropTech',
+];
+
+const STAGE_OPTIONS = ['Idea / Bootstrap', 'Pre-Seed', 'Seed', 'Series A+'];
+
+/** Keeps a prefilled free-text value (e.g. from a business profile) selectable. */
+function withCurrent(options: string[], current: string | undefined): string[] {
+  return current && !options.includes(current) ? [current, ...options] : options;
+}
+
+/** The setup form's fields, prefilled from a business the founder belongs to. */
+function businessSetupValues(business: Pick<Business, 'name' | 'tagline' | 'description' | 'industry' | 'stage'>) {
+  const concept = [business.tagline, business.description].map((part) => part?.trim()).filter(Boolean).join('. ');
+  return {
+    businessName: business.name,
+    description: concept,
+    industry: business.industry?.trim() || '',
+    fundingStage: business.stage?.trim() || '',
+  };
+}
 
 const setupSchema = z.object({
   mode: z.enum(['panel', 'coach', 'solo']),
@@ -74,6 +116,17 @@ export default function PrePitchSetup() {
     attemptsUsed: number;
     maxAttempts: number;
   } | null>(null);
+
+  // Business practice bridge. Optional: AI-first founders can practise
+  // without ever creating a business. When one is chosen, submit mints a
+  // short-lived practice draft so the server can verify membership and link
+  // the private session to the business.
+  const [searchParams] = useSearchParams();
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [selectedBusinessId, setSelectedBusinessId] = useState('');
+  const [practiceQuestion, setPracticeQuestion] = useState('');
+  const [bridgeError, setBridgeError] = useState('');
+  const businessPrefillApplied = useRef(false);
 
   const handleUploadDeck = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -154,6 +207,30 @@ export default function PrePitchSetup() {
   const aggressiveness = watch('aggressiveness');
   const riskAppetite = watch('riskAppetite');
   const duration = watch('duration') || FREE_DURATION;
+  const industryValue = watch('industry');
+  const fundingStageValue = watch('fundingStage');
+  const selectedBusiness = businesses.find((business) => business.id === selectedBusinessId) || null;
+
+  const applyBusinessValues = (values: ReturnType<typeof businessSetupValues>) => {
+    if (values.businessName) setValue('businessName', values.businessName, { shouldValidate: true });
+    if (values.description) setValue('description', values.description, { shouldValidate: true });
+    if (values.industry) setValue('industry', values.industry, { shouldValidate: true });
+    if (values.fundingStage) setValue('fundingStage', values.fundingStage, { shouldValidate: true });
+    // A business's free-text industry/stage may not be a stock option yet; the
+    // matching <option> only exists after the re-render, so set the selects
+    // again once it does, keeping the DOM and the form value in step.
+    window.setTimeout(() => {
+      if (values.industry) setValue('industry', values.industry);
+      if (values.fundingStage) setValue('fundingStage', values.fundingStage);
+    }, 0);
+  };
+
+  const chooseBusiness = (businessId: string) => {
+    setSelectedBusinessId(businessId);
+    setBridgeError('');
+    const business = businesses.find((item) => item.id === businessId);
+    if (business) applyBusinessValues(businessSetupValues(business));
+  };
 
   const preSelectedDeckName = location.state?.preSelectedDeck;
   // "Pitch Again": previous session's config + compact previous-attempt context
@@ -230,6 +307,19 @@ export default function PrePitchSetup() {
     fetchInitialData();
   }, [preSelectedDeckName]);
 
+  // The live room loads on demand (App.tsx). Fetch its code while the founder
+  // fills in this form, so "Enter Live Room" opens instantly. Same module as
+  // the route's import, so the browser downloads it once.
+  useEffect(() => {
+    void import('./LivePitchRoom').catch(() => {
+      // Non-fatal: the route will load it (and retry) when opened.
+    });
+    trackEvent({
+      name: 'practice_setup_opened',
+      properties: { fromBusiness: Boolean(searchParams.get('business') || searchParams.get('draft')) },
+    });
+  }, []);
+
   // The plan arrives asynchronously (/me resolves on mount and on window
   // focus), and a downgrade can land while this form is open. If the selected
   // duration is no longer permitted, snap it back so the user is never shown a
@@ -239,6 +329,54 @@ export default function PrePitchSetup() {
       setValue('duration', allowedDurations[0]);
     }
   }, [duration, user?.plan, setValue]);
+
+  // Load the founder's businesses, then apply any business handoff once the
+  // profile / re-pitch prefill above has run: a business wins over the legacy
+  // onboarding profile, but never over an explicit "Pitch Again".
+  useEffect(() => {
+    if (isLoading || businessPrefillApplied.current) return;
+    businessPrefillApplied.current = true;
+    let cancelled = false;
+    (async () => {
+      let list: Business[] = [];
+      try {
+        list = await listBusinesses(authFetch);
+        if (!cancelled) setBusinesses(list);
+      } catch {
+        // Workspace unavailable (for example before migration 0019): the
+        // founder can still practise without a business.
+      }
+      if (cancelled) return;
+
+      const draftId = searchParams.get('draft');
+      if (draftId) {
+        try {
+          const draft = await getPracticeDraft(authFetch, draftId);
+          if (cancelled) return;
+          setSelectedBusinessId(draft.businessId);
+          if (draft.question) setPracticeQuestion(draft.question);
+          setValue('mode', draft.mode);
+          if (!repitch) applyBusinessValues(draft.context);
+        } catch (error) {
+          if (!cancelled) {
+            setBridgeError(error instanceof Error ? error.message : 'This practice link has expired.');
+          }
+        }
+        return;
+      }
+
+      const requestedBusinessId =
+        searchParams.get('business') || location.state?.businessId || repitch?.config?.businessId || '';
+      const business = list.find((item) => item.id === requestedBusinessId);
+      if (business) {
+        setSelectedBusinessId(business.id);
+        if (!repitch) applyBusinessValues(businessSetupValues(business));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading]);
 
   const toggleScreenShare = async (checked: boolean) => {
     if (checked) {
@@ -289,7 +427,32 @@ export default function PrePitchSetup() {
       return;
     }
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
+    setBridgeError('');
+
+    // Link the private session to a business through a fresh, single-use
+    // draft. The server re-checks membership when the session starts.
+    let practiceDraftId: string | undefined;
+    if (selectedBusinessId) {
+      try {
+        const draft = await createPracticeDraft(authFetch, {
+          businessId: selectedBusinessId,
+          mode: data.mode,
+          question: practiceQuestion.trim() || undefined,
+        });
+        practiceDraftId = draft.id;
+      } catch (error) {
+        setBridgeError(
+          error instanceof Error
+            ? `${error.message} You can also practise without linking a business.`
+            : 'We could not link this business. You can practise without linking it.',
+        );
+        setIsSubmitting(false);
+        return;
+      }
+    } else {
+      await new Promise(resolve => setTimeout(resolve, 800));
+    }
+
     navigate('/room', {
       state: {
         pitchConfig: {
@@ -299,6 +462,11 @@ export default function PrePitchSetup() {
           // give the panel memory of the previous attempt.
           parentSessionId: repitch?.parentSessionId,
           previousSession: repitch?.previousSession,
+          // Business bridge. Only meaningful with a draft: the server ignores
+          // the question unless a valid draft links this session to a business.
+          ...(practiceDraftId
+            ? { practiceDraftId, practiceQuestion: practiceQuestion.trim() }
+            : {}),
         },
       },
     });
@@ -349,6 +517,64 @@ export default function PrePitchSetup() {
         {/* LEFT COLUMN: Setup */}
         <div className="lg:col-span-8 flex flex-col gap-6 lg:overflow-y-auto pr-0 lg:pr-2 custom-scrollbar">
           
+          {(businesses.length > 0 || selectedBusinessId || bridgeError) && (
+            <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-3xl border border-slate-200 dark:border-zinc-800 shadow-sm shrink-0 space-y-3">
+              {(businesses.length > 0 || selectedBusinessId) && (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                  <label htmlFor="practice-business" className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5 shrink-0">
+                    <Building2 size={14} className="text-sky-500" /> Practise for
+                  </label>
+                  <select
+                    id="practice-business"
+                    value={selectedBusinessId}
+                    onChange={(event) => chooseBusiness(event.target.value)}
+                    className="w-full sm:flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  >
+                    <option value="">No business (quick practice)</option>
+                    {businesses.map((business) => (
+                      <option key={business.id} value={business.id}>{business.name}</option>
+                    ))}
+                    {selectedBusinessId && !selectedBusiness && (
+                      <option value={selectedBusinessId}>Linked business</option>
+                    )}
+                  </select>
+                </div>
+              )}
+
+              {selectedBusinessId && (
+                <>
+                  <div className="space-y-1.5">
+                    <label htmlFor="practice-question" className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+                      <MessageSquareQuote size={14} className="text-sky-500" /> Question to practise (optional)
+                    </label>
+                    <textarea
+                      id="practice-question"
+                      value={practiceQuestion}
+                      onChange={(event) => setPracticeQuestion(event.target.value)}
+                      maxLength={PRACTICE_QUESTION_MAX}
+                      rows={2}
+                      placeholder="e.g. How will you reach your next 100 customers?"
+                      className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl resize-none dark:border-zinc-700 dark:text-zinc-100"
+                    />
+                    {currentMode === 'solo' && practiceQuestion.trim() && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                        Solo sessions have no live AI, so this question is only asked in Coach or Panel mode.
+                      </p>
+                    )}
+                  </div>
+                  <p className="flex items-start gap-2 text-[11px] leading-relaxed text-slate-500 dark:text-zinc-400">
+                    <ShieldCheck size={13} className="mt-0.5 shrink-0 text-emerald-500" />
+                    Private personal session. Your report, transcript and recording stay private and never appear on your public profile.
+                  </p>
+                </>
+              )}
+
+              {bridgeError && (
+                <p role="alert" className="text-xs font-medium text-rose-600 dark:text-rose-400">{bridgeError}</p>
+              )}
+            </div>
+          )}
+
           <div data-tour="setup-mode" className="flex gap-2 sm:gap-4 shrink-0">
             <ModeCard title="AI Panel" icon={Users} active={currentMode === 'panel'} onClick={() => setValue('mode', 'panel')} />
             <ModeCard title="Coach" icon={Target} active={currentMode === 'coach'} onClick={() => setValue('mode', 'coach')} />
@@ -368,19 +594,9 @@ export default function PrePitchSetup() {
                 <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5"><AlignLeft size={14} className="text-sky-500"/> Industry & Persona</label>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <select {...register('industry')} className="w-full sm:flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
-                    <option value="SaaS & Enterprise">SaaS & Enterprise</option>
-                    <option value="Fintech">Fintech</option>
-                    <option value="Healthtech">Healthtech</option>
-                    <option value="Consumer Social & Media">Consumer Social & Media</option>
-                    <option value="E-commerce & Retail">E-commerce & Retail</option>
-                    <option value="Artificial Intelligence & ML">Artificial Intelligence & ML</option>
-                    <option value="CleanTech & Sustainability">CleanTech & Sustainability</option>
-                    <option value="Biotech & Life Sciences">Biotech & Life Sciences</option>
-                    <option value="DeepTech & Aerospace">DeepTech & Aerospace</option>
-                    <option value="EdTech">EdTech</option>
-                    <option value="Crypto & Web3">Crypto & Web3</option>
-                    <option value="Hardware / IoT">Hardware / IoT</option>
-                    <option value="Logistics & PropTech">Logistics & PropTech</option>
+                    {withCurrent(INDUSTRY_OPTIONS, industryValue).map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
                   </select>
                   <select {...register('investorArchetype')} className="w-full sm:flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
                     <option value="Seed Stage - Venture Capital">Seed VC</option>
@@ -400,10 +616,9 @@ export default function PrePitchSetup() {
                 <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5"><Clock size={14} className="text-sky-500"/> Funding & Duration</label>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <select {...register('fundingStage')} className="w-full sm:flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
-                    <option value="Idea / Bootstrap">Idea / Bootstrap</option>
-                    <option value="Pre-Seed">Pre-Seed</option>
-                    <option value="Seed">Seed</option>
-                    <option value="Series A+">Series A+</option>
+                    {withCurrent(STAGE_OPTIONS, fundingStageValue).map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
                   </select>
                   {/*
                     A <select> to match every other field in this section. The

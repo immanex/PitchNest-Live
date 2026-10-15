@@ -78,7 +78,8 @@ export function InstallPrompt() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-50 p-3 lg:hidden pointer-events-none">
+    // Sits above the phone tab bar in AppLayout.
+    <div className="fixed bottom-16 inset-x-0 z-50 p-3 lg:hidden pointer-events-none">
       <div className="pointer-events-auto mx-auto max-w-md bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-4">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0">

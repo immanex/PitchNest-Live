@@ -242,8 +242,6 @@ import {
   generateMonthlyReport,
 } from "../../../api/organization";
 
-const ORG_ID = "12345"; // from auth/session context in your real app
-
 const deriveAnalytics = (founders: FounderDrilldown[]) => {
   const byKey = <K extends string>(getKey: (f: FounderDrilldown) => K) => {
     const map: Record<string, number[]> = {};
@@ -669,7 +667,7 @@ const NAV_ITEMS: { key: NavKey; label: string; icon: React.ReactNode }[] = [
 /* ------------------------------------------------------------------ */
 
 const OrganizationDashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { logout, authFetch } = useAuth();
   const navigate = useNavigate();
   const [data, setData] = useState<OrgDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -681,18 +679,16 @@ const OrganizationDashboard: React.FC = () => {
   const [founderFilters, setFounderFilters] = useState<DashboardFilters>(DEFAULT_FILTERS);
   const [selectedFounderId, setSelectedFounderId] = useState<string>("");
 
-  const orgId = user?.orgCode ? String(user.orgCode) : (user?.id ? String(user.id) : ORG_ID);
-
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     Promise.all([
-      fetchOrgDetails(orgId),
-      fetchOverview(orgId),
-      fetchSeatUsage(orgId),
-      fetchActivity(orgId),
-      fetchFounders(orgId),
-      fetchMembers(orgId),
+      fetchOrgDetails(authFetch),
+      fetchOverview(authFetch),
+      fetchSeatUsage(authFetch),
+      fetchActivity(authFetch),
+      fetchFounders(authFetch),
+      fetchMembers(authFetch),
     ])
       .then(([organization, overview, seatUsage, activity, founders, members]) => {
         if (cancelled) return;
@@ -706,7 +702,7 @@ const OrganizationDashboard: React.FC = () => {
       .catch((e) => !cancelled && setError(e.message))
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
-  }, [orgId]);
+  }, [authFetch]);
 
   const filteredMembers = useMemo(() => {
     if (!data) return [];
@@ -948,7 +944,7 @@ const OrganizationDashboard: React.FC = () => {
                   cohorts={data.filters.cohorts}
                 />
               )}
-              {active === "reports" && <ReportsTab orgId={orgId} />}
+              {active === "reports" && <ReportsTab />}
               {active === "replays" && <ReplaysTab />}
             </div>
           </main>
@@ -2182,7 +2178,8 @@ const MiniStat: React.FC<{
 /*  TAB: REPORTS                                                        */
 /* ------------------------------------------------------------------ */
 
-const ReportsTab: React.FC<{ orgId?: string }> = ({ orgId = ORG_ID }) => {
+const ReportsTab: React.FC = () => {
+  const { authFetch } = useAuth();
   const [reports, setReports] = useState<any[]>([]);
   const [generating, setGenerating] = useState<"weekly" | "monthly" | null>(
     null,
@@ -2191,7 +2188,7 @@ const ReportsTab: React.FC<{ orgId?: string }> = ({ orgId = ORG_ID }) => {
   const runWeekly = async () => {
     setGenerating("weekly");
     try {
-      const r = await generateWeeklyReport(orgId);
+      const r = await generateWeeklyReport(authFetch);
       setReports((prev) => [r, ...prev]);
     } finally {
       setGenerating(null);
@@ -2201,7 +2198,7 @@ const ReportsTab: React.FC<{ orgId?: string }> = ({ orgId = ORG_ID }) => {
   const runMonthly = async () => {
     setGenerating("monthly");
     try {
-      const r = await generateMonthlyReport(orgId);
+      const r = await generateMonthlyReport(authFetch);
       setReports((prev) => [r, ...prev]);
     } finally {
       setGenerating(null);

@@ -7,29 +7,49 @@ import type {
   OrganizationDetails,
 } from "../pages/organization/dashbaord/Main";
 
-const BASE_URL = "/api/organization"; // adjust to your mount path
+const BASE_URL = "/api/organization";
 
-async function post<T>(path: string, body: Record<string, any>): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+export type AuthFetch = (url: string, options?: RequestInit) => Promise<Response>;
+
+async function post<T>(
+  authFetch: AuthFetch,
+  path: string,
+  body: Record<string, unknown> = {},
+): Promise<T> {
+  const res = await authFetch(`${BASE_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`Request to ${path} failed (${res.status})`);
-  const json = await res.json();
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(json?.error || `Request to ${path} failed (${res.status})`);
+  }
   return json.data as T;
 }
 
-export const fetchOrgDetails = (orgId: string) =>
-  post<OrganizationDetails>("/details", { orgId });
-export const fetchOverview = (orgId: string) => post<OrgOverview>("/overview", { orgId });
-export const fetchSeatUsage = (orgId: string) => post<SeatUsage>("/seats", { orgId });
-export const fetchActivity = (orgId: string) => post<ActivityOverview>("/activity", { orgId });
-export const fetchFounders = (orgId: string) =>
-  post<{ founders: FounderDrilldown[] }>("/founder-drill", { orgId }).then((d) => d.founders);
-export const fetchMembers = (orgId: string) =>
-  post<{ members: Member[] }>("/members", { orgId }).then((d) => d.members);
-export const generateWeeklyReport = (orgId: string, date?: string) =>
-  post<any>("/reports/weekly", { orgId, date });
-export const generateMonthlyReport = (orgId: string, month?: number, year?: number) =>
-  post<any>("/reports/monthly", { orgId, month, year });
+// Organization identity and scope are derived from the authenticated token.
+// No API accepts an organization id from browser-controlled request data.
+export const fetchOrgDetails = (authFetch: AuthFetch) =>
+  post<OrganizationDetails>(authFetch, "/details");
+export const fetchOverview = (authFetch: AuthFetch) =>
+  post<OrgOverview>(authFetch, "/overview");
+export const fetchSeatUsage = (authFetch: AuthFetch) =>
+  post<SeatUsage>(authFetch, "/seats");
+export const fetchActivity = (authFetch: AuthFetch) =>
+  post<ActivityOverview>(authFetch, "/activity");
+export const fetchFounders = (authFetch: AuthFetch) =>
+  post<{ founders: FounderDrilldown[] }>(authFetch, "/founder-drill").then(
+    (data) => data.founders,
+  );
+export const fetchMembers = (authFetch: AuthFetch) =>
+  post<{ members: Member[] }>(authFetch, "/members").then(
+    (data) => data.members,
+  );
+export const generateWeeklyReport = (authFetch: AuthFetch, date?: string) =>
+  post<any>(authFetch, "/reports/weekly", { date });
+export const generateMonthlyReport = (
+  authFetch: AuthFetch,
+  month?: number,
+  year?: number,
+) => post<any>(authFetch, "/reports/monthly", { month, year });

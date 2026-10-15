@@ -37,15 +37,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (explicitWs) {
       WS_URL = explicitWs;
     } else if (isLocal) {
-      // In dev with Vite dev server (e.g. port 5174), route through the proxied /ws endpoint.
-      // If frontend is served directly by Express backend (e.g. port 3000), connect to host directly.
-      WS_URL = window.location.port === '3000'
-        ? `${protocol}//${window.location.host}`
-        : `${protocol}//${window.location.host}/ws`;
+      WS_URL = `${protocol}//${window.location.host}/ws`;
     } else if (onRender) {
-      WS_URL = `${protocol}//${window.location.host}`;
+      WS_URL = `${protocol}//${window.location.host}/ws`;
     } else {
-      WS_URL = 'wss://pitchnestv1.onrender.com';
+      WS_URL = 'wss://pitchnestv1.onrender.com/ws';
+    }
+
+    // The backend accepts upgrades only on /ws. Preserve an explicitly
+    // configured custom path, but normalize bare origins to the protected path.
+    try {
+      const parsed = new URL(WS_URL);
+      if (!parsed.pathname || parsed.pathname === '/') parsed.pathname = '/ws';
+      WS_URL = parsed.toString();
+    } catch {
+      console.error('Invalid VITE_WS_BACKEND_URL');
+      return;
     }
 
     // Append JWT for server-side authentication on the WS connection.

@@ -22,8 +22,14 @@ Disallow: /dashboard
 Disallow: /setup
 Disallow: /report
 Disallow: /replay
-Disallow: /pitches
 Disallow: /settings
 Disallow: /organization
 Disallow: /organization-login
 Disallow: /reset-password
+Disallow: /workspace/
+Disallow: /staff/
+
+# /pitches is now Pitch Arena: founder-published text pitches, public on purpose.
+# Private practice archives live at /archive and stay behind login.
+
+Sitemap: https://www.pitchnest.app/sitemap.xml

@@ -111,7 +111,12 @@ export default function SettingsPage() {
   const [notifications, setNotifications] = useState({
     pitchAlerts: true,
     weeklyReport: false,
-    investorInquiries: true
+    investorInquiries: true,
+    // In-app ecosystem notifications. On unless the user turns them off; the
+    // server treats a missing key as on too.
+    businessActivity: true,
+    followedUpdates: true,
+    communityReplies: true,
   });
 
   // Recognition language for live sessions. `null` means "no preference" — we
@@ -760,6 +765,57 @@ export default function SettingsPage() {
                   checked={notifications.weeklyReport}
                   onCheckedChange={(checked) => {
                     const next = { ...notifications, weeklyReport: checked };
+                    setNotifications(next);
+                    persistSettings({ notifications: next });
+                  }}
+                  className="w-11 h-6 bg-slate-200 dark:bg-zinc-800 rounded-full relative data-[state=checked]:bg-sky-500 transition-colors cursor-pointer outline-none"
+                >
+                  <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow-sm transition-transform translate-x-1 data-[state=checked]:translate-x-6" />
+                </Switch.Root>
+              </SettingItem>
+
+              <SettingItem
+                label="Questions on My Businesses"
+                description="In-app notification when someone comments on a business you manage."
+              >
+                <Switch.Root
+                  checked={notifications.businessActivity}
+                  onCheckedChange={(checked) => {
+                    const next = { ...notifications, businessActivity: checked };
+                    setNotifications(next);
+                    persistSettings({ notifications: next });
+                  }}
+                  className="w-11 h-6 bg-slate-200 dark:bg-zinc-800 rounded-full relative data-[state=checked]:bg-sky-500 transition-colors cursor-pointer outline-none"
+                >
+                  <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow-sm transition-transform translate-x-1 data-[state=checked]:translate-x-6" />
+                </Switch.Root>
+              </SettingItem>
+
+              <SettingItem
+                label="Updates From Businesses I Follow"
+                description="In-app notification when a business you follow posts an update or milestone."
+              >
+                <Switch.Root
+                  checked={notifications.followedUpdates}
+                  onCheckedChange={(checked) => {
+                    const next = { ...notifications, followedUpdates: checked };
+                    setNotifications(next);
+                    persistSettings({ notifications: next });
+                  }}
+                  className="w-11 h-6 bg-slate-200 dark:bg-zinc-800 rounded-full relative data-[state=checked]:bg-sky-500 transition-colors cursor-pointer outline-none"
+                >
+                  <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow-sm transition-transform translate-x-1 data-[state=checked]:translate-x-6" />
+                </Switch.Root>
+              </SettingItem>
+
+              <SettingItem
+                label="Replies to My Discussions"
+                description="In-app notification when someone replies to a discussion you started."
+              >
+                <Switch.Root
+                  checked={notifications.communityReplies}
+                  onCheckedChange={(checked) => {
+                    const next = { ...notifications, communityReplies: checked };
                     setNotifications(next);
                     persistSettings({ notifications: next });
                   }}

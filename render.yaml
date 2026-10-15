@@ -35,3 +35,18 @@ services:
         sync: false
       - key: AZURE_SPEECH_REGION
         sync: false
+      - key: PUBLIC_SITE_URL
+        value: https://www.pitchnest.app
+      # Discover engagement stays dark until migration 0021 is applied and a
+      # moderator account has users.is_staff = TRUE. Then set to "true".
+      - key: FEATURE_DISCOVER_ENGAGEMENT
+        value: "false"
+      # Community discussions stay dark until migration 0023 is applied and
+      # moderators are ready. Then set to "true".
+      - key: FEATURE_COMMUNITY
+        value: "false"
+      # Pitch Arena (text pitches and structured feedback) stays dark until
+      # migration 0026 is applied and FEATURE_DISCOVER_ENGAGEMENT is on, since
+      # pitch feedback is posted as profile comments. Then set to "true".
+      - key: FEATURE_PITCH_ARENA
+        value: "false"

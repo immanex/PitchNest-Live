@@ -13,6 +13,7 @@ import { SectionReveal } from '../components/landing/SectionReveal';
 import { HeroWords, heroBlock, heroEase } from '../components/landing/HeroWords';
 import { InvestorMarquee } from '../components/landing/InvestorMarquee';
 import { StatsBand } from '../components/landing/StatsBand';
+import { DiscoverShowcase } from '../components/landing/DiscoverShowcase';
 import { LogoLink, LogoMark } from '../components/Logo';
 import { getPlans } from '../lib/plans';
 import { usePublicPrice } from '../hooks/usePublicPrice';
@@ -84,6 +85,7 @@ const faqs = [
 ];
 
 const navLinks = [
+  { href: "/discover", label: "Discover" },
   { href: "#how-it-works", label: "How it works" },
   { href: "#your-report", label: "Your report" },
   { href: "#why-pitchnest", label: "Why PitchNest" },
@@ -486,6 +488,11 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* ── Discover ──
+            Entry into the founder ecosystem: real published businesses only.
+            Sits after the rehearsal story so the core product still leads. */}
+        <DiscoverShowcase isLoggedIn={isLoggedIn} />
+
         {/* ── Pricing (condensed) ──
             Deliberately a summary, not the full matrix: three cards, the headline
             constraint of each, and one CTA into /pricing for detail. Keeping the
@@ -629,6 +636,7 @@ export default function LandingPage() {
             <div>
               <h4 className="font-bold mb-3 sm:mb-6 text-sm">Platform</h4>
               <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-slate-500 dark:text-zinc-400">
+                <li><Link to="/discover" className="hover:text-sky-600 dark:hover:text-sky-400">Discover</Link></li>
                 <li><a href="#how-it-works" className="hover:text-sky-600 dark:hover:text-sky-400">How it works</a></li>
                 <li><a href="#your-report" className="hover:text-sky-600 dark:hover:text-sky-400">Your report</a></li>
                 <li><a href="#why-pitchnest" className="hover:text-sky-600 dark:hover:text-sky-400">Why PitchNest</a></li>

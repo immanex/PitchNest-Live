@@ -9,6 +9,15 @@
   --color-sidebar-bg: #FFFFFF;
   --color-card-bg: #FFFFFF;
 
+  /* Accent: the ecosystem yellow. Fills and markers use accent; text on a
+     yellow fill uses accent-ink; yellow text on light surfaces uses
+     accent-text so it stays readable (dark mode uses accent directly). */
+  --color-accent: #FFD268;
+  --color-accent-strong: #F5B82E;
+  --color-accent-soft: #FFF6DB;
+  --color-accent-ink: #1F2440;
+  --color-accent-text: #A16207;
+
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
 }
@@ -98,6 +107,22 @@
     @apply hover:bg-slate-50 dark:hover:bg-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700;
   }
 
+  /* Accent call to action (yellow), used sparingly next to btn-primary. */
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold rounded-xl transition-all duration-200;
+    @apply bg-accent text-accent-ink hover:bg-[#FFE19C];
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 14px rgba(245, 184, 46, 0.25);
+  }
+
+  .btn-accent:hover {
+    transform: translateY(-1px);
+  }
+
+  /* Small uppercase label above a heading. */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-accent-text dark:text-accent;
+  }
+
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200;
     @apply text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100;
@@ -154,7 +179,7 @@
 
   /* ── Inputs ── */
   .input-field {
-    @apply w-full px-4 py-3 text-sm rounded-xl border transition-all duration-200 outline-none;
+    @apply w-full px-4 py-3 text-sm font-normal rounded-xl border transition-all duration-200 outline-none;
     @apply bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800;
     @apply text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500;
     @apply focus:border-sky-500/50 focus:ring-2 focus:ring-sky-500/15;

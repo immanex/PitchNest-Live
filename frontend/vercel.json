@@ -2,6 +2,21 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "https://pitchnestv1.onrender.com/sitemap.xml"
+    },
+    {
+      "source": "/businesses/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Slackbot|WhatsApp|TelegramBot|Discordbot|Pinterestbot|redditbot|SkypeUriPreview|Embedly|Iframely|vkShare|Quora Link Preview|Mastodon).*"
+        }
+      ],
+      "destination": "https://pitchnestv1.onrender.com/api/public/businesses/:slug/share-html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

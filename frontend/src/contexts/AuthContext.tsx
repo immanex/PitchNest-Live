@@ -11,7 +11,7 @@ import Cookies from "js-cookie";
 export type UserRole = "Founder" | "Investor" | "Advisor";
 
 /** Mirrors the backend entitlement tiers (see entitlementService.ts). */
-export type UserPlan = "free" | "pro";
+export type UserPlan = "free" | "prep" | "pro" | "founder" | "enterprise";
 
 export interface User {
   id: number;
@@ -34,6 +34,7 @@ export interface User {
   isTrial?: boolean;
   trialDaysRemaining?: number;
   trialExpiresAt?: string | null;
+  onboardingCompleted?: boolean;
   orgCode?: number | string;
   accountType?: "user" | "organization";
 }
@@ -186,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ email, password, rememberMe }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Login failed");
+    if (!res.ok) throw new Error(data.error || data.message || "Login failed");
 
     setUser(data.user);
     setToken(data.token);
@@ -204,7 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ email, password, rememberMe }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Login failed");
+    if (!res.ok) throw new Error(data.error || data.message || "Login failed");
 
     setUser(data.user);
     setToken(data.token);
