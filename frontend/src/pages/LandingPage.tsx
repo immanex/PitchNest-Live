@@ -14,6 +14,7 @@ import { HeroWords, heroBlock, heroEase } from '../components/landing/HeroWords'
 import { InvestorMarquee } from '../components/landing/InvestorMarquee';
 import { StatsBand } from '../components/landing/StatsBand';
 import { DiscoverShowcase } from '../components/landing/DiscoverShowcase';
+import { PlatformOverview } from '../components/landing/PlatformOverview';
 import { LogoLink, LogoMark } from '../components/Logo';
 import { getPlans } from '../lib/plans';
 import { usePublicPrice } from '../hooks/usePublicPrice';
@@ -76,19 +77,21 @@ const whyItems = [
 ];
 
 const faqs = [
-  { q: "What is PitchNest?", a: "A private rehearsal room where you pitch to an AI investor panel that questions your deck and scores your readiness — so you fix the gaps before real meetings." },
+  { q: "What is PitchNest?", a: "One place to prepare and showcase your startup. Rehearse in private with an AI investor panel that questions your deck and scores your readiness, then publish a business profile on Discover when you're ready to be found." },
+  { q: "What is Discover?", a: "A public directory of founder-run businesses: software, services, physical products and traditional businesses. Create a business in your workspace, preview exactly what will be shown, and publish when you're ready. You can unpublish at any time." },
+  { q: "If I publish my business, is my practice still private?", a: "Yes. Decks, recordings, transcripts and reports never appear on your public profile. Someone else can see a report only if you turn on its share link, and you can turn that off again whenever you like." },
   { q: "How realistic is the panel?", a: "It asks the kinds of pointed, adaptive questions real partners do, and debates your thesis out loud. It's practice — not a prediction of any investor's decision." },
   { q: "Can I upload my pitch deck?", a: "Yes. The panel reads it and asks questions grounded in your slides and numbers." },
   { q: "Does it judge how I look on camera?", a: "Not today. PitchNest analyzes your spoken pitch and your deck. Visual delivery analysis is on our roadmap." },
   { q: "What do I get after a session?", a: "A readiness report on screen, on every plan: the verdict, the scorecard across delivery, clarity, scalability and readiness, every question the panel asked, and how your confidence moved across the pitch. The downloadable written report adds the prioritised action plan, the questions to prepare answers for, the competitive landscape and SWOT, and practice drills. Re-pitch and either report measures this attempt against your last one." },
-  { q: "Is it free?", a: "There's a free plan: 2 pitch sessions a week, 10 minutes each, with your full report on screen. Pro adds unlimited sessions, longer pitch durations, live market research in the panel, and the downloadable PDF report." },
+  { q: "Is it free?", a: "There's a free plan: 2 pitch sessions a week, 10 minutes each, with your full report on screen. Paid plans add unlimited sessions, longer pitch durations and the downloadable PDF report, and Pro adds live market research in the panel. Discover, business profiles and the opportunities board are free." },
 ];
 
 const navLinks = [
+  { href: "#platform", label: "Platform" },
   { href: "/discover", label: "Discover" },
+  { href: "/opportunities", label: "Opportunities" },
   { href: "#how-it-works", label: "How it works" },
-  { href: "#your-report", label: "Your report" },
-  { href: "#why-pitchnest", label: "Why PitchNest" },
   { href: "#pricing", label: "Pricing" },
   { href: "#faq", label: "FAQ" },
 ];
@@ -222,16 +225,16 @@ export default function LandingPage() {
                 <motion.div variants={heroBlock} className="flex mb-5">
                   <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                    For founders raising pre-seed to Series A
+                    For founders building, pitching and raising
                   </span>
                 </motion.div>
 
                 <HeroWords />
 
                 <motion.p variants={heroBlock} className="mt-4 mb-7 text-base sm:text-lg leading-relaxed text-slate-600 dark:text-zinc-400 max-w-xl">
-                  A rehearsal room where you pitch to an AI investor panel that listens,
-                  pushes back, and grills your deck — then hands you a scored readiness
-                  report showing exactly what to fix.
+                  Pitch to an AI investor panel that listens, pushes back and grills your
+                  deck, then get a scored report showing exactly what to fix. When you're
+                  ready, give your business a public profile people can discover.
                 </motion.p>
 
                 <motion.div variants={heroBlock} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-3">
@@ -295,6 +298,11 @@ export default function LandingPage() {
 
         <InvestorMarquee />
         <StatsBand />
+
+        {/* ── Platform ──
+            Everything one account gets, up front, before the rehearsal story
+            goes deep. Flag-gated features show as "Soon" until switched on. */}
+        <PlatformOverview isLoggedIn={isLoggedIn} />
 
         {/* ── The Problem ── */}
         <section id="problem" className="py-[clamp(36px,4vw,60px)] border-y border-slate-100 dark:border-zinc-800/60 scroll-mt-28">
@@ -616,7 +624,7 @@ export default function LandingPage() {
                 <LogoMark size="xs" />
                 <span className="text-base font-bold">PitchNest</span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 leading-relaxed mb-4">Rehearse your raise with an AI investor panel — and walk in ready.</p>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 leading-relaxed mb-4">Rehearse your pitch, showcase your business, and find your next opportunity.</p>
               <div className="flex items-center gap-3">
                 <a href="https://facebook.com/pitchnestapp" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center text-slate-500 dark:text-zinc-400 hover:text-blue-600 hover:border-blue-300 dark:hover:border-blue-500 transition-colors" aria-label="Facebook">
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
@@ -637,6 +645,7 @@ export default function LandingPage() {
               <h4 className="font-bold mb-3 sm:mb-6 text-sm">Platform</h4>
               <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-slate-500 dark:text-zinc-400">
                 <li><Link to="/discover" className="hover:text-sky-600 dark:hover:text-sky-400">Discover</Link></li>
+                <li><Link to="/opportunities" className="hover:text-sky-600 dark:hover:text-sky-400">Opportunities</Link></li>
                 <li><a href="#how-it-works" className="hover:text-sky-600 dark:hover:text-sky-400">How it works</a></li>
                 <li><a href="#your-report" className="hover:text-sky-600 dark:hover:text-sky-400">Your report</a></li>
                 <li><a href="#why-pitchnest" className="hover:text-sky-600 dark:hover:text-sky-400">Why PitchNest</a></li>
