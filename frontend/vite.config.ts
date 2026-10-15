@@ -89,7 +89,7 @@ export default defineConfig(({ mode }) => {
           ws: true,
           changeOrigin: true,
           secure: false,
-          rewrite: (path) => path.replace(/^\/ws/, ''),
+          // No rewrite: the backend accepts upgrades only on /ws.
         },
       },
     },
