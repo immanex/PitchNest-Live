@@ -57,3 +57,13 @@ bugs fixing/
 *_bugs.txt
 *.mermaid
 
+# Generated documents — rebuilt from their sources, never committed
+/*.pdf
+Docs/*.pdf
+
+# Internal product & strategy material. This repository is public, so plans,
+# pricing proposals and audit write-ups stay local.
+PitchNest_Ecosystem_v2/
+Docs/PitchNest_Ecosystem_Integration_Plan.md
+Docs/generate-ecosystem-integration-plan-pdf.mjs
+
