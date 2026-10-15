@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { ArrowBigUp, MapPin, MessageSquare } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { PublicBusinessSummary } from "../../api/publicBusinesses";
@@ -44,6 +44,55 @@ export function BusinessInitials({ name, slug, size = "md" }: { name: string; sl
   );
 }
 
+const LOGO_DIMENSIONS = {
+  sm: "h-8 w-8 rounded-lg p-0.5",
+  md: "h-11 w-11 rounded-xl p-1",
+  lg: "h-16 w-16 rounded-2xl p-1.5",
+  xl: "h-24 w-24 rounded-3xl p-2",
+} as const;
+
+/**
+ * The business's approved logo on a white tile, or its initials when it has
+ * none (or the image fails to load). Logos keep their shape inside the tile.
+ */
+export function BusinessLogo({
+  name,
+  slug,
+  logoUrl,
+  size = "md",
+  className = "",
+}: {
+  name: string;
+  slug: string;
+  logoUrl?: string | null;
+  size?: keyof typeof LOGO_DIMENSIONS;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (!logoUrl || failed) {
+    const initialsSize = size === "xl" ? "lg" : size;
+    return (
+      <span className={className}>
+        <BusinessInitials name={name} slug={slug} size={initialsSize} />
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-zinc-700 ${LOGO_DIMENSIONS[size]} ${className}`}
+    >
+      <img
+        src={logoUrl}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        className="h-full w-full object-contain"
+      />
+    </span>
+  );
+}
+
 export function BusinessList({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <ol
@@ -72,7 +121,7 @@ export function BusinessRow({
       {rank !== undefined && (
         <span className="hidden w-5 shrink-0 text-center text-xs font-bold tabular-nums text-slate-400 sm:block">{rank}</span>
       )}
-      <BusinessInitials name={business.name} slug={business.slug} />
+      <BusinessLogo name={business.name} slug={business.slug} logoUrl={business.logoUrl} />
       <div className="min-w-0 flex-1">
         <Heading className="truncate font-sans text-sm font-extrabold text-slate-950 dark:text-white">
           <Link

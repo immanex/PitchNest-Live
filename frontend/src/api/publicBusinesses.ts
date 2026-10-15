@@ -13,9 +13,20 @@ export interface PublicBusinessSummary {
   industry: string;
   stage: string;
   region: string;
+  /** Approved images; null when the business has none. */
+  logoUrl: string | null;
+  coverUrl: string | null;
   publishedAt: string | null;
   /** Present only while Discover engagement is enabled on the server. */
   engagement?: { supportCount: number; commentCount: number };
+}
+
+export interface PublicTeamMember {
+  name: string;
+  title: string;
+  avatarUrl: string | null;
+  /** Their founder page, when they have one. */
+  handle: string | null;
 }
 
 export interface PublicBusinessProfile extends PublicBusinessSummary {
@@ -24,6 +35,8 @@ export interface PublicBusinessProfile extends PublicBusinessSummary {
   solution: string;
   targetCustomer: string;
   websiteUrl: string;
+  /** Members who chose to appear publicly. */
+  team: PublicTeamMember[];
 }
 
 export interface PublicDirectoryFilters {

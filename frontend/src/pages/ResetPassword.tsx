@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Lock, Eye, EyeOff } from 'lucide-react';
 
 export default function ResetPassword() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const token = searchParams.get('token') || '';
+  const [token] = useState(() => new URLSearchParams(window.location.search).get('token') || '');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [show, setShow] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (token) window.history.replaceState(window.history.state, '', '/reset-password');
+  }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +49,7 @@ export default function ResetPassword() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-white">Set new password</h1>
-            <p className="text-sm text-slate-500">Choose a password at least 6 characters long.</p>
+            <p className="text-sm text-slate-500">Choose a password between 10 and 72 characters.</p>
           </div>
         </div>
         {status === 'success' ? (
@@ -57,14 +60,14 @@ export default function ResetPassword() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="relative">
               <input type={show ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="New password" minLength={6}
+                placeholder="New password" minLength={10} maxLength={72}
                 className="w-full px-4 py-3 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:text-white pr-10" required />
               <button type="button" onClick={() => setShow(s => !s)} className="absolute right-3 top-3 text-slate-400">
                 {show ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
             <input type={show ? 'text' : 'password'} value={confirm} onChange={e => setConfirm(e.target.value)}
-              placeholder="Confirm new password"
+              placeholder="Confirm new password" minLength={10} maxLength={72}
               className="w-full px-4 py-3 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:text-white" required />
             {status === 'error' && <p className="text-sm text-red-500">{message}</p>}
             <button type="submit" disabled={status === 'loading'}

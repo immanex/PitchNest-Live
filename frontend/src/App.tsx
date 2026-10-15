@@ -54,6 +54,7 @@ const OrganizationLogin = lazyPage(() => import("./pages/organization/auth/Login
 const BusinessWorkspace = lazyPage(() => import("./pages/BusinessWorkspace"));
 const Discover = lazyPage(() => import("./pages/Discover"));
 const PublicBusinessProfile = lazyPage(() => import("./pages/PublicBusinessProfile"));
+const FounderProfile = lazyPage(() => import("./pages/FounderProfile"));
 const ModerationPage = lazyPage(() => import("./pages/staff/ModerationPage"));
 const Community = lazyPage(() => import("./pages/Community"));
 const CommunityThread = lazyPage(() => import("./pages/CommunityThread"));
@@ -127,6 +128,14 @@ export default function App() {
                 element={
                   <ErrorBoundary>
                     <PublicBusinessProfile />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/founders/:handle"
+                element={
+                  <ErrorBoundary>
+                    <FounderProfile />
                   </ErrorBoundary>
                 }
               />

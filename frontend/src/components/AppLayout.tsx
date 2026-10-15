@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Compass,
   MessagesSquare,
+  UserRound,
   CalendarDays,
   Presentation,
   Home,
@@ -80,6 +81,7 @@ const PAGE_INFO: Array<{ test: (pathname: string) => boolean; title: string; are
   { test: (p) => p === '/home', title: 'Home', area: 'Founder ecosystem' },
   { test: (p) => p === '/discover', title: 'Discover', area: 'Founder ecosystem' },
   { test: (p) => p.startsWith('/businesses/'), title: 'Business profile', area: 'Founder ecosystem' },
+  { test: (p) => p.startsWith('/founders/'), title: 'Founder', area: 'Founder ecosystem' },
   { test: (p) => p.startsWith('/pitches'), title: 'Pitch Arena', area: 'Founder ecosystem' },
   { test: (p) => p.startsWith('/community'), title: 'Community', area: 'Founder ecosystem' },
   { test: (p) => p.startsWith('/opportunities'), title: 'Opportunities', area: 'Founder ecosystem' },
@@ -317,6 +319,7 @@ export default function AppLayout() {
                 const Icon =
                   item.type === 'business_update' ? Megaphone :
                   item.type === 'community_reply' ? MessagesSquare :
+                  item.type === 'founder_update' || item.type === 'founder_business' ? UserRound :
                   MessageSquare;
                 return (
                   <DropdownMenu.Item
@@ -333,7 +336,9 @@ export default function AppLayout() {
                         ? 'bg-emerald-50 text-emerald-500 dark:bg-emerald-950/20'
                         : item.type === 'community_reply'
                           ? 'bg-violet-50 text-violet-500 dark:bg-violet-950/20'
-                          : 'bg-sky-50 text-sky-500 dark:bg-sky-950/20',
+                          : item.type === 'founder_update' || item.type === 'founder_business'
+                            ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/20'
+                            : 'bg-sky-50 text-sky-500 dark:bg-sky-950/20',
                     )}>
                       <Icon size={16} />
                     </div>

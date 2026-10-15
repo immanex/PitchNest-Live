@@ -24,6 +24,9 @@ export interface Business {
   solution: string;
   targetCustomer: string;
   websiteUrl: string;
+  /** Short-lived signed URLs of the draft images (visible to members only). */
+  logoUrl: string | null;
+  coverUrl: string | null;
   status: BusinessStatus;
   profileVersion: number;
   publishedAt: string | null;
@@ -55,8 +58,20 @@ export interface BusinessMember {
   role: BusinessRole;
   status: "invited" | "active" | "suspended" | "removed";
   publicDisplayConsent: boolean;
+  publicTitle: string;
+  /** Their founder page handle, for members shown publicly. */
+  founderHandle: string | null;
   joinedAt: string | null;
 }
+
+export interface PublicTeamMember {
+  name: string;
+  title: string;
+  avatarUrl: string | null;
+  handle: string | null;
+}
+
+export type BusinessMediaKind = "logo" | "cover";
 
 export interface PublicationPreview {
   preview: Pick<
@@ -74,7 +89,9 @@ export interface PublicationPreview {
     | "solution"
     | "targetCustomer"
     | "websiteUrl"
-  >;
+    | "logoUrl"
+    | "coverUrl"
+  > & { team: PublicTeamMember[] };
   profileVersion: number;
   consentVersion: string;
   canPublish: boolean;
@@ -146,19 +163,65 @@ export const getPublicationPreview = (
   businessId: string,
 ) => request<PublicationPreview>(authFetch, `/${businessId}/publication-preview`);
 
-export const publishBusiness = (
+/** Publishes the previewed version. `warning` is set when images failed to go public. */
+export async function publishBusiness(
   authFetch: AuthFetch,
   businessId: string,
   preview: PublicationPreview,
-) =>
-  request<Business>(authFetch, `/${businessId}/publish`, {
+): Promise<{ business: Business; warning: string | null }> {
+  const response = await authFetch(`/api/businesses/${businessId}/publish`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       confirmed: true,
       consentVersion: preview.consentVersion,
       profileVersion: preview.profileVersion,
     }),
   });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(body?.error || body?.message || `Business request failed (${response.status}).`);
+  }
+  return { business: body.data as Business, warning: typeof body?.warning === "string" ? body.warning : null };
+}
+
+/** Replaces the logo or cover draft. Sent as multipart, so no JSON header. */
+export async function uploadBusinessMedia(
+  authFetch: AuthFetch,
+  businessId: string,
+  kind: BusinessMediaKind,
+  file: File,
+): Promise<Business> {
+  const form = new FormData();
+  form.append("image", file);
+  const response = await authFetch(`/api/businesses/${businessId}/media/${kind}`, {
+    method: "PUT",
+    body: form,
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(body?.error || `Upload failed (${response.status}).`);
+  }
+  return (body as ApiEnvelope<Business>).data;
+}
+
+export const removeBusinessMedia = (
+  authFetch: AuthFetch,
+  businessId: string,
+  kind: BusinessMediaKind,
+) => request<Business>(authFetch, `/${businessId}/media/${kind}`, { method: "DELETE" });
+
+/** The caller's own choice to appear on the public profile. */
+export const updateMyPublicProfile = (
+  authFetch: AuthFetch,
+  businessId: string,
+  input: { consent: boolean; title?: string },
+) =>
+  request<{ publicDisplayConsent: boolean; publicTitle: string; founderHandle: string | null }>(
+    authFetch,
+    `/${businessId}/members/me/public-profile`,
+    { method: "PUT", body: JSON.stringify(input) },
+  );
 
 export const unpublishBusiness = (authFetch: AuthFetch, businessId: string) =>
   request<Business>(authFetch, `/${businessId}/unpublish`, { method: "POST" });

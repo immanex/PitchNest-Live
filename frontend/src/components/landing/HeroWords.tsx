@@ -36,12 +36,12 @@ export function HeroWords() {
       <motion.div variants={block}>
         <motion.h1
           variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.02 } } }}
-          className="font-display text-[2rem] sm:text-4xl lg:text-[clamp(2.4rem,4.4vw,3.1rem)] font-semibold leading-[1.12] tracking-tight"
+          className="font-display text-[2.2rem] sm:text-5xl lg:text-[clamp(2.8rem,4.6vw,3.6rem)] font-semibold leading-[1.06] tracking-tight"
         >
-          <FadeWords text="You get one shot with each investor." />
+          <FadeWords text="Get investor-ready." />
           <br />
           <span className="gradient-text">
-            <FadeWords text="Practice it first." />
+            <FadeWords text="Then get discovered." />
           </span>
         </motion.h1>
       </motion.div>

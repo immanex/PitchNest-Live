@@ -2,6 +2,7 @@ import React from "react";
 import { ArrowBigUp, ArrowRight, Building2, MapPin, MessageSquare } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { PublicBusinessSummary } from "../../api/publicBusinesses";
+import { BusinessLogo } from "./BusinessRow";
 
 /**
  * The public business card used by /discover and the landing page's
@@ -37,11 +38,28 @@ export function BusinessCard({
       className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/10 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-800"
     >
       <div className="relative h-24 overflow-hidden bg-gradient-to-br from-indigo-600 via-violet-600 to-sky-500 p-4">
-        <div className="absolute -right-8 -top-12 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
+        {business.coverUrl ? (
+          <>
+            <img
+              src={business.coverUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-linear-to-b from-black/30 via-transparent to-black/20" />
+          </>
+        ) : (
+          <div className="absolute -right-8 -top-12 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
+        )}
         <div className="relative flex items-start justify-between">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/25 bg-white/15 text-lg font-extrabold text-white backdrop-blur">
-            {initials(business.name) || <Building2 size={20} />}
-          </span>
+          {business.logoUrl ? (
+            <BusinessLogo name={business.name} slug={business.slug} logoUrl={business.logoUrl} size="md" />
+          ) : (
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/25 bg-white/15 text-lg font-extrabold text-white backdrop-blur">
+              {initials(business.name) || <Building2 size={20} />}
+            </span>
+          )}
           <span className="rounded-full bg-black/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/90 backdrop-blur">
             {titleCase(business.businessType)}
           </span>

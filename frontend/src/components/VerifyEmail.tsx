@@ -154,6 +154,8 @@ export default function VerifyEmailPage() {
           localStorage.setItem("user", JSON.stringify(data.user));
           localStorage.setItem("token", data.token);
           navigate(data.redirectTo || "/onboarding", { replace: true });
+        } else if (data.alreadyVerified) {
+          navigate("/login", { replace: true });
         } else {
           if (isManual) {
             setErrorMessage(data.message || "Invalid code");
@@ -214,6 +216,7 @@ export default function VerifyEmailPage() {
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get("token");
     if (token) {
+      window.history.replaceState(window.history.state, "", "/verify");
       verifyToken(token, false);
     }
   }, []);

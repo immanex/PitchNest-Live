@@ -4,11 +4,13 @@ import { AlertTriangle, Loader2, Trash2 } from 'lucide-react';
 import LegalLayout from '../../components/LegalLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { CONTACT_EMAIL, LEGAL_LAST_UPDATED } from '../../lib/legal';
+import { GoogleSignInButton } from '../../components/GoogleSignInButton';
 
 export default function DeleteAccount() {
   const { user, token, logout, authFetch } = useAuth();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
+  const [googleCredential, setGoogleCredential] = useState('');
   const [email, setEmail] = useState(user?.email || '');
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState('');
@@ -23,8 +25,9 @@ export default function DeleteAccount() {
       setError('Please confirm that you understand this action is permanent.');
       return;
     }
-    if (!password) {
-      setError('Password is required to delete your account.');
+    const googleAccount = user?.authProvider === 'google';
+    if (googleAccount ? !googleCredential : (!password && !googleCredential)) {
+      setError(googleAccount ? 'Confirm your Google account first.' : 'Confirm your password or Google account.');
       return;
     }
 
@@ -35,7 +38,7 @@ export default function DeleteAccount() {
         res = await authFetch('/api/auth/account', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password }),
+          body: JSON.stringify({ password, googleCredential }),
         });
       } else {
         if (!email) {
@@ -46,7 +49,7 @@ export default function DeleteAccount() {
         res = await fetch('/api/auth/delete-account', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email, password, googleCredential }),
         });
       }
 
@@ -138,9 +141,9 @@ export default function DeleteAccount() {
             </div>
           )}
 
-          <div>
+          {user?.authProvider !== 'google' && <div>
             <label className="block text-sm font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
-              Password (required to confirm)
+              Password
             </label>
             <input
               type="password"
@@ -148,10 +151,32 @@ export default function DeleteAccount() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
               placeholder="Your account password"
-              required
+              required={!googleCredential}
               autoComplete="current-password"
             />
-          </div>
+          </div>}
+
+          {(user?.authProvider === 'google' || !token) && (
+            <div className="space-y-2">
+              <p className="text-sm font-bold text-slate-700 dark:text-zinc-300">
+                {googleCredential ? 'Google account confirmed' : 'Confirm with Google'}
+              </p>
+              {googleCredential ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  Identity confirmed. Submit below to permanently delete the account.
+                </div>
+              ) : (
+                <GoogleSignInButton
+                  text="signin_with"
+                  onCredential={(credential) => {
+                    setGoogleCredential(credential);
+                    setError('');
+                  }}
+                  onError={setError}
+                />
+              )}
+            </div>
+          )}
 
           <label className="flex items-start gap-3 cursor-pointer">
             <input

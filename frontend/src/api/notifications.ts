@@ -1,6 +1,11 @@
 import type { AuthFetch } from "./businesses";
 
-export type NotificationType = "business_comment" | "business_update" | "community_reply";
+export type NotificationType =
+  | "business_comment"
+  | "business_update"
+  | "community_reply"
+  | "founder_update"
+  | "founder_business";
 
 export interface AppNotification {
   id: string;

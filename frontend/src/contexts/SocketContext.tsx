@@ -55,14 +55,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    // Append JWT for server-side authentication on the WS connection.
+    // Browser WebSockets cannot set Authorization. Offer the JWT as a protocol
+    // token so it never appears in the URL, proxy logs or browser history.
     const token = localStorage.getItem('token');
-    if (token) {
-      const sep = WS_URL.includes('?') ? '&' : '?';
-      WS_URL += `${sep}token=${encodeURIComponent(token)}`;
-    }
+    if (!token) return;
 
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(WS_URL, ['pitchnest-v1', `pitchnest-auth.${token}`]);
 
     ws.onopen = () => {
       console.log('✅ Connected to PitchNest Brain');

@@ -52,7 +52,7 @@ export function DiscoverShowcase({ isLoggedIn }: { isLoggedIn: boolean }) {
     >
       <div className="max-w-295 mx-auto px-5 sm:px-7">
         <SectionReveal className="text-center mb-8 sm:mb-10 max-w-3xl mx-auto">
-          <p className="section-label mb-3">Discover</p>
+          <p className="eyebrow justify-center mb-3">Discover</p>
           <h2 className="section-heading mb-4">Great businesses deserve to be discovered</h2>
           <p className="section-subheading mx-auto">
             Founders building software, services, physical products and traditional businesses share what

@@ -42,6 +42,7 @@ import { useUpgrade } from "../components/ui/UpgradeModal";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { matchAnswerTip, type AnswerTip } from "../lib/answerTips";
 import { FirstTimeTour } from "../components/FirstTimeTour";
+import { API_BASE_URL } from "../lib/apiBase";
 
 declare global {
   interface Window {
@@ -483,7 +484,7 @@ const getDeckUrl = (url: string) => {
   if (isLocal) {
     return url.startsWith("/") ? url : `/${url}`;
   }
-  return `https://pitchnest-live.onrender.com${url.startsWith("/") ? url : `/${url}`}`;
+  return `${API_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
 };
 
 const getDeckDisplayUrl = (url: string) => {
@@ -745,13 +746,6 @@ export default function LivePitchRoom() {
     }
     return 15 * 60;
   });
-
-  // Mirror of timeLeft for non-reactive reads (e.g. the client_ready resume
-  // payload) without adding timeLeft to effect deps.
-  const timeLeftRef = useRef(timeLeft);
-  useEffect(() => {
-    timeLeftRef.current = timeLeft;
-  }, [timeLeft]);
 
   // Live per-panelist interest (panel mode only), pushed by the server.
   const [panelInterest, setPanelInterest] = useState<Record<string, string>>(
@@ -1432,7 +1426,6 @@ export default function LivePitchRoom() {
         socket.send(
           JSON.stringify({
             type: "prepare_evaluation",
-            transcript: messagesRef.current,
           }),
         );
       }
@@ -1623,12 +1616,16 @@ export default function LivePitchRoom() {
       socket.send(
         JSON.stringify({
           type: "client_ready",
-          config: { ...pitchConfig, userId: user?.id },
+          // browserLanguages lets the server pick a speech locale for founders
+          // who have not chosen one in Settings (inferSttLocale).
+          config: {
+            ...pitchConfig,
+            userId: user?.id,
+            browserLanguages: Array.from(navigator.languages ?? []).slice(0, 5),
+          },
           ...(isResumeRef.current
             ? {
                 resume: true,
-                transcript: messagesRef.current,
-                timeLeftSeconds: timeLeftRef.current,
               }
             : {}),
         }),
@@ -2685,7 +2682,6 @@ export default function LivePitchRoom() {
       socket.send(
         JSON.stringify({
           type: "prepare_evaluation",
-          transcript: messagesRef.current,
         }),
       );
     }
@@ -2746,7 +2742,6 @@ export default function LivePitchRoom() {
       socket.send(
         JSON.stringify({
           type: "prepare_evaluation",
-          transcript: messagesRef.current,
         }),
       );
     }
@@ -2818,14 +2813,9 @@ export default function LivePitchRoom() {
 
       setLoadingStatus("Panel is grading your pitch while audio uploads...");
       if (socket && socket.readyState === WebSocket.OPEN) {
-        const finalDuration = Math.floor(
-          (Date.now() - pitchStartTimeRef.current) / 1000,
-        );
         socket.send(
           JSON.stringify({
             type: "end_session",
-            duration: finalDuration,
-            transcript: messagesRef.current,
           }),
         );
       }

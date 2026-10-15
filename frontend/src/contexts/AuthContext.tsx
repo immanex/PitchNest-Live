@@ -37,6 +37,7 @@ export interface User {
   onboardingCompleted?: boolean;
   orgCode?: number | string;
   accountType?: "user" | "organization";
+  authProvider?: "form" | "google";
 }
 
 function safeParse<T = any>(value: string | null): T | null {
@@ -171,11 +172,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {
         // Network error — trust local storage to avoid locking out offline users
-        const stored = safeParse<User>(storedUser);
-        if (stored) {
-          setUser(stored);
-          setToken(storedToken);
-        }
       })
       .finally(() => setIsLoading(false));
   }, [refreshSession]);
@@ -266,6 +262,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    const currentToken = token || localStorage.getItem("token");
+    if (currentToken) {
+      void fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${currentToken}` },
+      }).catch(() => undefined);
+    }
     setUser(null);
     setToken(null);
     localStorage.removeItem("user");

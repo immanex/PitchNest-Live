@@ -78,7 +78,7 @@ export function PlatformOverview({ isLoggedIn }: { isLoggedIn: boolean }) {
     <section id="platform" className="py-[clamp(36px,4vw,60px)] scroll-mt-28">
       <div className="max-w-295 mx-auto px-5 sm:px-7">
         <SectionReveal className="text-center mb-8 sm:mb-10 max-w-3xl mx-auto">
-          <p className="section-label mb-3">One account</p>
+          <p className="eyebrow justify-center mb-3">One account</p>
           <h2 className="section-heading mb-4">Prepare in private. Showcase in public. Grow with founders.</h2>
           <p className="section-subheading mx-auto">
             PitchNest is where you get ready for the room and where people find what you're building.

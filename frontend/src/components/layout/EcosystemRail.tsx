@@ -6,7 +6,7 @@ import { useEcosystemFeatures } from "../../hooks/useEcosystemFeatures";
 import { fetchPublicBusinesses, type PublicBusinessSummary } from "../../api/publicBusinesses";
 import { fetchOpportunities, type Opportunity } from "../../api/opportunities";
 import { fetchPitches, type PitchSummary } from "../../api/pitches";
-import { BusinessInitials } from "../discover/BusinessRow";
+import { BusinessLogo } from "../discover/BusinessRow";
 
 /**
  * The right-hand column on ecosystem pages (wide screens only). Every card
@@ -124,7 +124,7 @@ export function EcosystemRail({ hide = [] }: { hide?: RailCard[] }) {
               {businesses.data.map((business) => (
                 <li key={business.slug}>
                   <Link to={`/businesses/${encodeURIComponent(business.slug)}`} className="group flex items-center gap-2.5">
-                    <BusinessInitials name={business.name} slug={business.slug} size="sm" />
+                    <BusinessLogo name={business.name} slug={business.slug} logoUrl={business.logoUrl} size="sm" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-xs font-bold text-slate-900 group-hover:text-indigo-600 dark:text-zinc-100 dark:group-hover:text-indigo-300">
                         {business.name}

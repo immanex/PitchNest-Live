@@ -23,10 +23,11 @@ const signupSchema = z
   .object({
     name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.string().email("Invalid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
+    password: z.string().min(10, "Password must be at least 10 characters").max(72),
     confirmPassword: z
       .string()
-      .min(6, "Confirm password must be at least 6 characters"),
+      .min(10, "Confirm password must be at least 10 characters")
+      .max(72),
     role: z.enum(["Founder", "Investor", "Advisor"]),
   })
   .refine((data) => data.password === data.confirmPassword, {

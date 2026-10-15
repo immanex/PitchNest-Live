@@ -35,7 +35,29 @@ import { BusinessUpdatesFeed } from "../components/discover/BusinessUpdatesFeed"
 import { createPracticeDraft } from "../api/practice";
 import { BusinessDiscussion, type ComposeRequest } from "../components/discover/BusinessDiscussion";
 import { PublicPitchSection } from "../components/discover/PublicPitchSection";
-import { BusinessInitials } from "../components/discover/BusinessRow";
+import { BusinessLogo } from "../components/discover/BusinessRow";
+
+/** A consenting member's photo, or their initials if they have none. */
+function TeamAvatar({ name, url }: { name: string; url: string | null }) {
+  const [failed, setFailed] = React.useState(false);
+  if (url && !failed) {
+    return (
+      <img
+        src={url}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-slate-200 dark:ring-zinc-700"
+      />
+    );
+  }
+  const letters = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+      {letters || "?"}
+    </span>
+  );
+}
 import { fetchPublicPitch, type FeedbackCategory, type PublicPitch } from "../api/pitches";
 import { ReportDialog, type ReportTarget } from "../components/discover/ReportDialog";
 import { useAuth } from "../contexts/AuthContext";
@@ -306,9 +328,21 @@ export default function PublicBusinessProfile() {
         <ArrowLeft size={14} /> Back to Discover
       </Link>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900 sm:p-7">
+      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        {business.coverUrl && (
+          <div className="h-36 bg-slate-100 dark:bg-zinc-800 sm:h-52">
+            <img src={business.coverUrl} alt="" decoding="async" className="h-full w-full object-cover" />
+          </div>
+        )}
+        <div className="p-5 sm:p-7">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <BusinessInitials name={business.name} slug={business.slug} size="lg" />
+          <BusinessLogo
+            name={business.name}
+            slug={business.slug}
+            logoUrl={business.logoUrl}
+            size={business.coverUrl ? "xl" : "lg"}
+            className={business.coverUrl ? "-mt-16 w-fit rounded-3xl ring-4 ring-white dark:ring-zinc-900 sm:-mt-20" : ""}
+          />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-3xl">{business.name}</h1>
@@ -377,6 +411,7 @@ export default function PublicBusinessProfile() {
             <EngagementCounts engagement={engagement} />
           </div>
         )}
+        </div>
       </section>
 
       {tabs.length > 1 && (
@@ -432,6 +467,33 @@ export default function PublicBusinessProfile() {
                 <Detail label="Region" value={business.region} />
               </dl>
             </section>
+
+            {business.team?.length > 0 && (
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                <h2 className="text-sm font-bold text-slate-950 dark:text-white">Team</h2>
+                <ul className="mt-4 space-y-3">
+                  {business.team.map((member, index) => (
+                    <li key={`${member.name}-${index}`} className="group relative flex items-center gap-3">
+                      <TeamAvatar name={member.name} url={member.avatarUrl} />
+                      <div className="min-w-0">
+                        {member.handle ? (
+                          <Link
+                            to={`/founders/${encodeURIComponent(member.handle)}`}
+                            className="block truncate text-sm font-semibold text-slate-900 outline-none after:absolute after:inset-0 group-hover:text-indigo-600 focus-visible:underline dark:text-zinc-100 dark:group-hover:text-indigo-300"
+                          >
+                            {member.name}
+                          </Link>
+                        ) : (
+                          <p className="truncate text-sm font-semibold text-slate-900 dark:text-zinc-100">{member.name}</p>
+                        )}
+                        {member.title && <p className="truncate text-xs text-slate-500 dark:text-zinc-400">{member.title}</p>}
+                      </div>
+                      {member.handle && <ArrowRight size={14} className="ml-auto shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-500 dark:text-zinc-600" />}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             {pitch && activeTab === "overview" && (
               <button

@@ -33,6 +33,9 @@ import { cn } from "../lib/utils";
 import { PracticeHistory } from "../components/business/PracticeHistory";
 import { BusinessActivityPanel } from "../components/business/BusinessActivityPanel";
 import { PublicPitchPanel } from "../components/business/PublicPitchPanel";
+import { BusinessMediaPanel } from "../components/business/BusinessMediaPanel";
+import { MyPublicProfile } from "../components/business/MyPublicProfile";
+import { BusinessLogo } from "../components/discover/BusinessRow";
 import { useEcosystemFeatures } from "../hooks/useEcosystemFeatures";
 import {
   archiveBusiness,
@@ -466,7 +469,21 @@ function PreviewModal({
         {preview && !loading && (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
             <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-              <div className="gradient-brand px-6 py-7 text-white sm:px-8">
+              <div className="relative gradient-brand px-6 py-7 text-white sm:px-8">
+                {preview.preview.coverUrl && (
+                  <>
+                    <img src={preview.preview.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    <div className="absolute inset-0 bg-slate-950/55" />
+                  </>
+                )}
+                <div className="relative">
+                {preview.preview.logoUrl && (
+                  <img
+                    src={preview.preview.logoUrl}
+                    alt=""
+                    className="mb-4 h-14 w-14 rounded-2xl bg-white object-contain p-1.5 shadow-sm"
+                  />
+                )}
                 <div className="mb-5 flex items-center justify-between gap-3">
                   <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider">
                     {titleCase(preview.preview.businessType)}
@@ -477,6 +494,7 @@ function PreviewModal({
                 <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/80">
                   {preview.preview.tagline || "No tagline added yet."}
                 </p>
+                </div>
               </div>
               <div className="space-y-6 p-6 sm:p-8">
                 <div className="flex flex-wrap gap-2">
@@ -497,6 +515,22 @@ function PreviewModal({
                 {preview.preview.websiteUrl && (
                   <div className="flex items-center gap-2 text-sm font-semibold text-indigo-600 dark:text-indigo-400">
                     <Globe2 size={16} /> {preview.preview.websiteUrl}
+                  </div>
+                )}
+                {preview.preview.team?.length > 0 && (
+                  <div className="border-t border-slate-100 pt-5 dark:border-zinc-800">
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Team</p>
+                    <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+                      {preview.preview.team.map((member, index) => (
+                        <li key={`${member.name}-${index}`} className="text-sm">
+                          <span className="font-semibold text-slate-800 dark:text-zinc-100">{member.name}</span>
+                          {member.title && <span className="text-slate-500 dark:text-zinc-400"> · {member.title}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-[11px] text-slate-400">
+                      Each person chose to appear and can turn it off in their own workspace.
+                    </p>
                   </div>
                 )}
               </div>
@@ -591,7 +625,7 @@ function PreviewSection({ title, value }: { title: string; value: string }) {
 }
 
 export default function BusinessWorkspace() {
-  const { authFetch } = useAuth();
+  const { authFetch, user } = useAuth();
   const navigate = useNavigate();
   const ecosystemFeatures = useEcosystemFeatures();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -759,10 +793,10 @@ export default function BusinessWorkspace() {
     setPublishing(true);
     setPreviewError("");
     try {
-      const updated = await publishBusiness(authFetch, selected.id, preview);
+      const { business: updated, warning } = await publishBusiness(authFetch, selected.id, preview);
       updateLocalBusiness(updated);
       setPreviewOpen(false);
-      setNotice(`${updated.name} is now published.`);
+      setNotice(warning ?? `${updated.name} is now published.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not publish this business.";
       setPreviewError(message);
@@ -961,9 +995,13 @@ export default function BusinessWorkspace() {
                         : "text-slate-600 hover:bg-slate-50 dark:text-zinc-400 dark:hover:bg-zinc-800/70",
                     )}
                   >
-                    <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400")}>
-                      <Building2 size={17} />
-                    </span>
+                    {business.logoUrl ? (
+                      <BusinessLogo name={business.name} slug={business.slug} logoUrl={business.logoUrl} size="sm" className="h-9! w-9!" />
+                    ) : (
+                      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400")}>
+                        <Building2 size={17} />
+                      </span>
+                    )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-bold">{business.name}</span>
                       <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium opacity-70">
@@ -986,9 +1024,13 @@ export default function BusinessWorkspace() {
               <div className="border-b border-slate-100 p-5 dark:border-zinc-800 sm:p-7">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex min-w-0 gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl gradient-brand text-white shadow-lg shadow-indigo-500/15">
-                      <Building2 size={23} />
-                    </div>
+                    {selected.logoUrl ? (
+                      <BusinessLogo name={selected.name} slug={selected.slug} logoUrl={selected.logoUrl} size="md" />
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl gradient-brand text-white shadow-lg shadow-indigo-500/15">
+                        <Building2 size={23} />
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="truncate text-xl font-extrabold text-slate-950 dark:text-white sm:text-2xl">{selected.name}</h2>
@@ -1132,6 +1174,8 @@ export default function BusinessWorkspace() {
                   )}
                 </section>
 
+                <BusinessMediaPanel business={selected} canEdit={canEdit} onUpdated={updateLocalBusiness} />
+
                 <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1199,10 +1243,28 @@ export default function BusinessWorkspace() {
                           <p className="truncate text-xs font-bold text-slate-800 dark:text-zinc-200">{member.name}</p>
                           <p className="truncate text-[10px] text-slate-400">{member.email || titleCase(member.role)}</p>
                         </div>
+                        {member.publicDisplayConsent && (
+                          <span className="rounded-md bg-emerald-50 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300" title="Shown on the public profile">
+                            Public
+                          </span>
+                        )}
                         <span className="rounded-md bg-slate-100 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-500 dark:bg-zinc-800 dark:text-zinc-400">{member.role}</span>
                       </div>
                     ))}
                   </div>
+                  {!membersLoading && !membersError && (() => {
+                    const me = members.find((member) => member.userId === Number(user?.id));
+                    return me ? (
+                      <MyPublicProfile
+                        businessId={selected.id}
+                        businessPublished={isPublished}
+                        member={me}
+                        onChange={(updated) =>
+                          setMembers((current) => current.map((member) => (member.userId === updated.userId ? updated : member)))
+                        }
+                      />
+                    ) : null;
+                  })()}
                 </section>
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">

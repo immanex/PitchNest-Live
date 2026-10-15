@@ -1,9 +1,10 @@
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { API_BASE_URL } from './lib/apiBase.ts';
 
 // Automatically route relative /api calls to the backend on hosted environments
-const API_URL = (import.meta.env.VITE_API_URL as string || 'https://pitchnestv1.onrender.com').replace(/\/+$/, '');
+const API_URL = API_BASE_URL;
 
 const isLocalhost =
   window.location.hostname === 'localhost' ||

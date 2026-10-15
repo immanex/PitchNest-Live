@@ -24,6 +24,7 @@ import { useBilling } from '../contexts/BillingContext';
 import { formatPrice } from '../lib/plans';
 import { planLabel } from '../lib/entitlements';
 import { CONTACT_EMAIL } from '../lib/legal';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import {
   DEFAULT_STT_LOCALE,
   TRANSCRIPTION_LOCALES,
@@ -116,6 +117,7 @@ export default function SettingsPage() {
     // server treats a missing key as on too.
     businessActivity: true,
     followedUpdates: true,
+    followedFounders: true,
     communityReplies: true,
   });
 
@@ -146,6 +148,7 @@ export default function SettingsPage() {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
+  const [deleteGoogleCredential, setDeleteGoogleCredential] = useState('');
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -292,8 +295,8 @@ export default function SettingsPage() {
       setDeleteError('Please confirm you understand this is permanent.');
       return;
     }
-    if (!deletePassword) {
-      setDeleteError('Enter your password to confirm deletion.');
+    if (user?.authProvider === 'google' ? !deleteGoogleCredential : !deletePassword) {
+      setDeleteError(user?.authProvider === 'google' ? 'Confirm your Google account.' : 'Enter your password to confirm deletion.');
       return;
     }
 
@@ -302,7 +305,10 @@ export default function SettingsPage() {
       const res = await authFetch('/api/auth/account', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: deletePassword }),
+        body: JSON.stringify({
+          password: deletePassword,
+          googleCredential: deleteGoogleCredential,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to delete account.');
@@ -571,6 +577,7 @@ export default function SettingsPage() {
                   onClick={() => {
                     setShowDeleteModal(true);
                     setDeletePassword('');
+                    setDeleteGoogleCredential('');
                     setDeleteConfirmed(false);
                     setDeleteError('');
                   }}
@@ -809,6 +816,23 @@ export default function SettingsPage() {
               </SettingItem>
 
               <SettingItem
+                label="Founders I Follow"
+                description="In-app notification when a founder you follow posts an update or appears on a new business."
+              >
+                <Switch.Root
+                  checked={notifications.followedFounders}
+                  onCheckedChange={(checked) => {
+                    const next = { ...notifications, followedFounders: checked };
+                    setNotifications(next);
+                    persistSettings({ notifications: next });
+                  }}
+                  className="w-11 h-6 bg-slate-200 dark:bg-zinc-800 rounded-full relative data-[state=checked]:bg-sky-500 transition-colors cursor-pointer outline-none"
+                >
+                  <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow-sm transition-transform translate-x-1 data-[state=checked]:translate-x-6" />
+                </Switch.Root>
+              </SettingItem>
+
+              <SettingItem
                 label="Replies to My Discussions"
                 description="In-app notification when someone replies to a discussion you started."
               >
@@ -849,47 +873,38 @@ export default function SettingsPage() {
             <h2 className="text-xl font-bold text-slate-900 dark:text-zinc-100">Voice &amp; Language</h2>
 
             <SettingSection title="Transcription">
-              <p className="text-sm text-slate-500 dark:text-zinc-500 -mt-2">
-                Your spoken pitch is transcribed before the panel hears it, and that transcript is
-                what gets scored. Telling us which English you actually speak is the single most
-                useful thing on this page — a mis-heard figure is a mis-scored answer.
-              </p>
-
               <SettingItem
                 label="Recognition language"
                 description="Applies to live voice sessions. Typed pitches are unaffected."
               >
                 <select
                   aria-label="Recognition language"
-                  value={effectiveSttLocale}
+                  value={sttLocale ?? 'auto'}
                   onChange={(e) => {
                     const next = e.target.value;
+                    if (next === 'auto') {
+                      setSttLocale(null);
+                      persistSettings({ sttLocale: 'auto' });
+                      return;
+                    }
                     if (!isSupportedSttLocale(next)) return;
                     setSttLocale(next);
                     persistSettings({ sttLocale: next });
                   }}
                   className="px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20 min-w-56"
                 >
+                  <option value="auto">Automatic (recommended)</option>
                   {TRANSCRIPTION_LOCALES.map((l) => (
                     <option key={l.code} value={l.code}>{l.label}</option>
                   ))}
                 </select>
               </SettingItem>
 
-              <p className="text-xs text-slate-400 dark:text-zinc-500">
-                Recognising as <span className="font-semibold text-slate-600 dark:text-zinc-300">{sttLocaleLabel(effectiveSttLocale)}</span>
-                {sttLocale ? ' — your saved preference.' : ' — the default, since you have not changed it.'}
-              </p>
-            </SettingSection>
-
-            <SettingSection title="Pitch vocabulary">
-              <p className="text-sm text-slate-500 dark:text-zinc-500 -mt-2">
-                Every session is biased toward the words founders and investors actually use —
-                metrics like TAM, CAC and LTV, terms like pre-seed and cap table, and African market
-                names like Lagos, naira and M-Pesa. Left to itself a speech model hears those as
-                ordinary English words, so "CAC" arrives as "cake" and a real number quietly
-                disappears from your answer. This is always on and needs no configuration.
-              </p>
+              {sttLocale && (
+                <p className="text-xs text-slate-400 dark:text-zinc-500">
+                  Using <span className="font-semibold text-slate-600 dark:text-zinc-300">{sttLocaleLabel(effectiveSttLocale)}</span>.
+                </p>
+              )}
             </SettingSection>
           </Tabs.Content>
 
@@ -906,15 +921,36 @@ export default function SettingsPage() {
             {deleteError && (
               <p className="text-sm text-rose-600 font-medium mb-3">{deleteError}</p>
             )}
-            <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">Password</label>
-            <input
-              type="password"
-              value={deletePassword}
-              onChange={(e) => setDeletePassword(e.target.value)}
-              className="w-full px-4 py-3 mb-4 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-sm"
-              placeholder="Confirm your password"
-              autoComplete="current-password"
-            />
+            {user?.authProvider === 'google' ? (
+              <div className="mb-4">
+                {deleteGoogleCredential ? (
+                  <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    Google account confirmed.
+                  </p>
+                ) : (
+                  <GoogleSignInButton
+                    text="signin_with"
+                    onCredential={(credential) => {
+                      setDeleteGoogleCredential(credential);
+                      setDeleteError('');
+                    }}
+                    onError={setDeleteError}
+                  />
+                )}
+              </div>
+            ) : (
+              <>
+                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">Password</label>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  className="w-full px-4 py-3 mb-4 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-sm"
+                  placeholder="Confirm your password"
+                  autoComplete="current-password"
+                />
+              </>
+            )}
             <label className="flex items-start gap-2 mb-6 cursor-pointer">
               <input
                 type="checkbox"
@@ -929,7 +965,11 @@ export default function SettingsPage() {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => setShowDeleteModal(false)}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeletePassword('');
+                  setDeleteGoogleCredential('');
+                }}
                 className="flex-1 py-3 border border-slate-200 dark:border-zinc-700 rounded-xl text-sm font-bold text-slate-700 dark:text-zinc-300"
               >
                 Cancel
