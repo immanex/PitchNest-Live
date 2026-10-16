@@ -40,9 +40,11 @@ import { useSocketContext } from "../contexts/SocketContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useUpgrade } from "../components/ui/UpgradeModal";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { UserAvatar } from "../components/ui/UserAvatar";
 import { matchAnswerTip, type AnswerTip } from "../lib/answerTips";
 import { FirstTimeTour } from "../components/FirstTimeTour";
 import { API_BASE_URL } from "../lib/apiBase";
+import { getStoredUser } from "../lib/authStorage";
 
 declare global {
   interface Window {
@@ -82,7 +84,6 @@ const VAD_BARGE_IN_MS = 600; // sustained speech duration that confirms an inten
 // wall time between two timestamps: a burst of late frames then still measures
 // exactly the audio it represents, and a stall in the audio thread measures as
 // silence instead of inflating the turn.
-const PCM_FRAME_MS = 64;
 const TTS_STREAM_FLUSH_MS = 650;
 const TTS_STREAM_SPEAK_MIN_CHARS = 120;
 
@@ -159,32 +160,29 @@ const VoiceWaveform = ({ isActive }: { isActive?: boolean }) => (
   </div>
 );
 
-const PANELISTS_AVATARS: Record<string, string> = {
-  marcus:
-    "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=300&h=300",
-  sarah:
-    "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300&h=300",
-  chen: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300&h=300",
-  elena:
-    "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=300&h=300",
-  david:
-    "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=300&h=300",
-  james:
-    "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=300&h=300",
-  riley:
-    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300&h=300",
-  taylor:
-    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=300&h=300",
+const PANELIST_COLORS: Record<string, [string, string]> = {
+  marcus: ["#0284c7", "#312e81"],
+  sarah: ["#7c3aed", "#be185d"],
+  chen: ["#059669", "#155e75"],
+  elena: ["#db2777", "#7c3aed"],
+  david: ["#ea580c", "#b91c1c"],
+  james: ["#4f46e5", "#0f766e"],
+  riley: ["#0d9488", "#4338ca"],
+  taylor: ["#9333ea", "#0369a1"],
 };
 
 function getPanelistAvatar(name: string): string {
   const normalized = name.toLowerCase().trim();
-  for (const [key, url] of Object.entries(PANELISTS_AVATARS)) {
-    if (normalized.includes(key)) {
-      return url;
-    }
-  }
-  return `https://i.pravatar.cc/300?u=${normalized}`;
+  const key = Object.keys(PANELIST_COLORS).find((candidate) => normalized.includes(candidate));
+  const [start, end] = key ? PANELIST_COLORS[key] : ["#475569", "#0f172a"];
+  const initials = name
+    .split(/\s+/)
+    .map((part) => part.replace(/[^a-z]/gi, "").charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "AI";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${start}"/><stop offset="1" stop-color="${end}"/></linearGradient></defs><rect width="160" height="160" rx="80" fill="url(#g)"/><circle cx="80" cy="62" r="31" fill="white" fill-opacity=".2"/><path d="M25 151c4-35 25-55 55-55s51 20 55 55" fill="white" fill-opacity=".2"/><text x="80" y="91" text-anchor="middle" font-family="Arial,sans-serif" font-size="42" font-weight="700" fill="white">${initials}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 // Panel-mode only: each panelist's live interest in the deal, pushed by the
@@ -468,9 +466,14 @@ let messageSeq = 0;
 const nextMessageId = (prefix: string) =>
   `${prefix}-${Date.now()}-${++messageSeq}`;
 
-const getDeckUrl = (url: string) => {
+const getDeckDisplayUrl = (url: string) => {
   if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  let parsed: URL;
+  try {
+    parsed = new URL(url, window.location.origin);
+  } catch {
+    return "";
+  }
   const hostname = window.location.hostname;
   const isLocal =
     hostname === "localhost" ||
@@ -480,27 +483,14 @@ const getDeckUrl = (url: string) => {
     hostname.startsWith("10.") ||
     /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
     hostname.endsWith(".local");
-
-  if (isLocal) {
-    return url.startsWith("/") ? url : `/${url}`;
-  }
-  return `${API_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
-};
-
-const getDeckDisplayUrl = (url: string) => {
-  if (!url) return "";
-  // S7: local-fallback /uploads paths are no longer publicly served — a raw
-  // path would only 404. Local-fallback decks get a token-gated /api/files
-  // URL from the signed-url endpoint; never fall back to the bare path here.
-  if (url.startsWith("/uploads/")) return "";
-  const deckUrl = getDeckUrl(url);
-  if (!deckUrl) return "";
-  // Item A: decks are now served via short-lived signed URLs (or legacy public
-  // URLs / local fallbacks). The Google Docs mobile viewer is gone — it both
-  // broke on signed URLs (they expire + include query tokens) and leaked deck
-  // content to a third party. Mobile browsers render PDFs natively in the
-  // iframe, so the signed URL works everywhere as-is.
-  return deckUrl;
+  if (
+    parsed.username ||
+    parsed.password ||
+    (parsed.protocol !== "https:" && !(isLocal && parsed.protocol === "http:"))
+  ) return "";
+  // Token-gated local files are returned as a backend-relative API URL.
+  if (url.startsWith("/api/files/")) return `${API_BASE_URL}${url}`;
+  return parsed.toString();
 };
 
 // ─── Stable camera viewer — lives OUTSIDE LivePitchRoom so its identity never
@@ -583,11 +573,11 @@ const CameraViewer = React.memo(
               <span className="absolute w-28 h-28 md:w-36 md:h-36 rounded-full ring-4 ring-emerald-400/40 animate-pulse" />
             </>
           )}
-          <img
-            src={avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userName || "Founder")}`}
-            alt="You"
+          <UserAvatar
+            name={userName}
+            avatarUrl={avatarUrl}
             className={cn(
-              "relative w-24 h-24 md:w-28 md:h-28 rounded-full object-cover border-4 bg-slate-800 transition-all duration-200",
+              "relative w-24 h-24 md:w-28 md:h-28 text-3xl md:text-4xl border-4 transition-all duration-200",
               isUserSpeaking
                 ? "border-emerald-400 shadow-[0_0_45px_rgba(52,211,153,0.55)]"
                 : "border-white/15",
@@ -665,10 +655,10 @@ export default function LivePitchRoom() {
 
   // ── Deck display URL (Item A: private-bucket access) ────────────────────
   // The media bucket is private, so the deck's stored file_url (a bare object
-  // path for new uploads, or a legacy public URL) is NOT directly renderable.
+  // path for new uploads) is NOT directly renderable.
   // Resolve a short-lived signed URL from the server once per selected deck and
-  // feed that to every deck consumer. Falls back to the raw stored URL if the
-  // signed fetch fails so a live pitch never blanks the deck tile.
+  // feed that to every deck consumer. A signing failure leaves the viewer blank
+  // rather than navigating an arbitrary legacy URL from a database row.
   const [deckDisplayUrl, setDeckDisplayUrl] = useState<string>("");
   // Number of pages in the deck, measured server-side from the document itself
   // (decks.page_count). This is what makes "Slide 4 of 12" real rather than a
@@ -685,10 +675,8 @@ export default function LivePitchRoom() {
       setDeckPageCount(0);
       return;
     }
-    // Local-fallback / legacy public URLs render directly — only sign when we
-    // have a deck id (new bare-path rows always do).
     if (!selectedDeck.id) {
-      setDeckDisplayUrl(getDeckDisplayUrl(selectedDeck.file_url));
+      setDeckDisplayUrl("");
       setDeckPageCount(0);
       return;
     }
@@ -698,16 +686,15 @@ export default function LivePitchRoom() {
         if (!res.ok) throw new Error(`signed-url ${res.status}`);
         const data = await res.json().catch(() => null);
         if (cancelled) return;
-        if (data?.url) setDeckDisplayUrl(data.url);
+        setDeckDisplayUrl(getDeckDisplayUrl(data?.url || ""));
         // Absent/zero means the server could not measure the document. The
         // viewer then renders the deck plainly instead of inventing slides.
         const pages = Number(data?.pageCount);
         setDeckPageCount(Number.isFinite(pages) && pages > 0 ? pages : 0);
       })
       .catch(() => {
-        // Fall back to the raw stored URL (renders for legacy public URLs).
         if (!cancelled) {
-          setDeckDisplayUrl(getDeckDisplayUrl(selectedDeck.file_url));
+          setDeckDisplayUrl("");
           setDeckPageCount(0);
         }
       });
@@ -717,10 +704,8 @@ export default function LivePitchRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deckId]);
 
-  // Final URL used by every deck consumer — signed when available, otherwise
-  // the raw stored value (legacy public URL / local fallback / plain path).
-  const resolvedDeckUrl =
-    deckDisplayUrl || (pitchConfig?.selectedDeck?.file_url ? getDeckDisplayUrl(pitchConfig.selectedDeck.file_url) : "");
+  // Final URL used by every deck consumer is always server-issued.
+  const resolvedDeckUrl = deckDisplayUrl;
 
   const [roomState, setRoomState] = useState<
     "waiting" | "countdown" | "live" | "resume"
@@ -1208,15 +1193,38 @@ export default function LivePitchRoom() {
   const isAiStreamingRef = useRef(false);
   const preferredVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const uploadPromiseRef = useRef<Promise<any> | null>(null);
+  const savedSessionIdRef = useRef<string | number | null>(null);
+  const pendingRecordingRef = useRef<string | null>(null);
+  const attachingRecordingRef = useRef(false);
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const pendingTimeoutsRef = useRef<number[]>([]);
+
+  const attachPendingRecording = useCallback(async () => {
+    const sessionId = savedSessionIdRef.current;
+    const recording = pendingRecordingRef.current;
+    if (!sessionId || !recording || attachingRecordingRef.current) return;
+    attachingRecordingRef.current = true;
+    try {
+      const response = await authFetch(`/api/sessions/${sessionId}/recording`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recording }),
+        keepalive: true,
+      });
+      if (response.ok) pendingRecordingRef.current = null;
+      else console.error("Audio recording could not be attached:", response.status);
+    } catch (error) {
+      console.error("Audio recording attach failed:", error);
+    } finally {
+      attachingRecordingRef.current = false;
+    }
+  }, [authFetch]);
 
   // ── Audio streaming pipeline refs ──────────────────────────────────────
   const audioStreamContextRef = useRef<AudioContext | null>(null);
   const audioStreamProcessorRef = useRef<AudioWorkletNode | null>(null);
   const audioStreamSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const noSpeechCountRef = useRef(0);
-   const userSpeakingStartRef = useRef<number | null>(null);
+  const userSpeakingStartRef = useRef<number | null>(null);
   // Adaptive VAD state (see VAD_* constants and the worklet handler below)
   const noiseFloorSamplesRef = useRef<number[]>([]);
   const vadThresholdRef = useRef<number>(VAD_MIN_THRESHOLD);
@@ -1226,15 +1234,6 @@ export default function LivePitchRoom() {
   // only call setState on transitions, not on every audio frame.
   const lastLoudFrameRef = useRef(0);
   const userSpeakingUiRef = useRef(false);
-  // Speech time the VAD has measured for the founder turn currently being
-  // transcribed, in milliseconds. Reset each time a turn is stamped onto a
-  // message, so each message carries the speech that produced it.
-  //
-  // This is the ONLY source of speaking-pace data in the product. It is a
-  // measurement, not an estimate — and when it is absent the pace is reported as
-  // unmeasured rather than guessed, because a founder can disprove a wrong
-  // number about their own speech and one such number discredits the report.
-  const turnSpeechMsRef = useRef(0);
   // ──────────────────────────────────────────────────────────────────────
 
   // ── Keep the screen awake while in the live pitch room ──────────────────
@@ -1327,7 +1326,7 @@ export default function LivePitchRoom() {
   }, []);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
+    const storedUser = getStoredUser();
     if (storedUser) {
       try {
         setUserData(JSON.parse(storedUser));
@@ -1598,7 +1597,7 @@ export default function LivePitchRoom() {
         };
         recorder.start(); // start recording without timeslice to prevent continuous encoder stutter on mobile
         mediaRecorderRef.current = recorder;
-        console.log("🎙️ Audio recording started");
+        if (AUDIO_DEBUG) console.log("🎙️ Audio recording started");
       } catch (recErr) {
         console.error("❌ Failed to start MediaRecorder:", recErr);
       }
@@ -1634,10 +1633,6 @@ export default function LivePitchRoom() {
     }
   }, [isPitching, isConnected, socket, pitchConfig, user?.id]);
 
-  const transcriptBufferRef = useRef<string>("");
-  const transcriptTimerRef = useRef<number | null>(null);
-  const recognitionRef = useRef<any>(null);
-
   // ── Raw PCM audio streaming to backend (Azure STT transcribes the user) ───
   useEffect(() => {
     if (!isPitching || !socket || !isConnected || isMicMuted || verdictPhase) {
@@ -1667,7 +1662,7 @@ export default function LivePitchRoom() {
 
     const startAudioCapture = async () => {
       const activeStream = streamRef.current || stream;
-      console.log("Stream tracks:", activeStream?.getTracks());
+      if (AUDIO_DEBUG) console.log("Stream tracks:", activeStream?.getTracks());
       if (cancelled || !activeStream) return;
       try {
       const ctx = new AudioContext({
@@ -1688,7 +1683,7 @@ export default function LivePitchRoom() {
         const { pcm, rms } = data;
         if (!window.firstAudioSent) {
           window.firstAudioSent = performance.now();
-          console.log("🎤 First audio sent:", window.firstAudioSent);
+          if (AUDIO_DEBUG) console.log("🎤 First audio sent:", window.firstAudioSent);
         }
         if (!window._pcmCount) window._pcmCount = 0;
         window._pcmCount++;
@@ -1717,9 +1712,11 @@ export default function LivePitchRoom() {
               floor * VAD_THRESHOLD_MULTIPLIER,
             );
             vadCalibratedRef.current = true;
-            console.log(
-              `🎚 VAD calibrated — noise floor ${floor.toFixed(3)}, threshold ${vadThresholdRef.current.toFixed(3)}`,
-            );
+            if (AUDIO_DEBUG) {
+              console.log(
+                `🎚 VAD calibrated — noise floor ${floor.toFixed(3)}, threshold ${vadThresholdRef.current.toFixed(3)}`,
+              );
+            }
           }
         }
 
@@ -1727,10 +1724,6 @@ export default function LivePitchRoom() {
         // single spike (cough, door slam) can't trigger a false barge-in.
         if (rms > vadThresholdRef.current && !isMicMuted) {
           vadLoudFrameCountRef.current++;
-          // Speaking-pace accounting. Uses the same loudness test that drives
-          // barge-in, including the mute guard: a muted microphone is not
-          // sending audio, so it is not speech time.
-          turnSpeechMsRef.current += PCM_FRAME_MS;
         } else {
           vadLoudFrameCountRef.current = 0;
         }
@@ -1786,9 +1779,11 @@ export default function LivePitchRoom() {
       source.connect(worklet);
       worklet.connect(silentSink);
       silentSink.connect(ctx.destination);
-      console.log(
-        `🎙 Audio capture started (${ctx.sampleRate}Hz → 16kHz PCM for Azure STT)`,
-      );
+      if (AUDIO_DEBUG) {
+        console.log(
+          `🎙 Audio capture started (${ctx.sampleRate}Hz → 16kHz PCM for Azure STT)`,
+        );
+      }
       } catch (err) {
         console.error("Failed to start audio capture pipeline:", err);
       }
@@ -1819,145 +1814,6 @@ export default function LivePitchRoom() {
     };
   }, [isPitching, socket, isConnected, isMicMuted, verdictPhase, stream]);
 
-  // ── SpeechRecognition for live text transcript display ─────────────────
-  useEffect(() => {
-    return; // Disabled — replaced by server-side STT (see sttService.ts)
-    if (!isPitching || !socket || !isConnected || isMicMuted || verdictPhase) {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort();
-        recognitionRef.current = null;
-      }
-      noSpeechCountRef.current = 0;
-      return;
-    }
-    if (recognitionRef.current) return;
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-    recognitionRef.current = recognition;
-    noSpeechCountRef.current = 0;
-
-    recognition.onstart = () => {
-      console.log("🎤 Recognition Started");
-      noSpeechCountRef.current = 0;
-    };
-
-    recognition.onresult = (event: any) => {
-      console.log(
-        "🗣 Recognition result fired, isSpeaking:",
-        isSpeakingRef.current,
-        "timeSinceAI:",
-        Date.now() - lastAiSpeakingEndedTimeRef.current,
-      );
-      noSpeechCountRef.current = 0; // Reset on successful speech
-      const now = Date.now();
-      const timeSinceAiSpoke = now - lastAiSpeakingEndedTimeRef.current;
-      if (isSpeakingRef.current || timeSinceAiSpoke < 1200) return;
-
-      const lastResult = event.results[event.results.length - 1];
-      if (!lastResult.isFinal) return;
-
-      const text = lastResult[0].transcript.trim();
-      if (!text) return;
-
-      // Display the voice message in the chat transcript
-      transcriptBufferRef.current +=
-        (transcriptBufferRef.current ? " " : "") + text;
-      if (transcriptTimerRef.current)
-        window.clearTimeout(transcriptTimerRef.current);
-
-      transcriptTimerRef.current = window.setTimeout(() => {
-        const finalPayload = transcriptBufferRef.current.trim();
-        transcriptBufferRef.current = "";
-        transcriptTimerRef.current = null;
-        if (!finalPayload) return;
-
-        console.log("✅ Voice transcript:", finalPayload);
-        // Hand this turn the speech time the VAD measured for it, then reset so
-        // the next utterance starts from zero. Rounded to 0.1s. Undefined — not
-        // zero — when nothing was measured, so the server can tell "the founder
-        // was silent" apart from "this client does not report timing", and only
-        // the former is a fact about the founder.
-        const speakSeconds =
-          turnSpeechMsRef.current > 0
-            ? Math.round(turnSpeechMsRef.current / 100) / 10
-            : undefined;
-        turnSpeechMsRef.current = 0;
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `user-voice-${Date.now()}`,
-            text: finalPayload,
-            type: "user",
-            speaker: userData.name,
-            inputMethod: "voice",
-            speakSeconds,
-          },
-        ]);
-        // Note: Raw audio is already being sent via the PCM pipeline above.
-        // We still send the text transcript for the chat log and backend eval.
-        console.log("📤 Sending voice_transcript:", finalPayload);
-        if (socket && socket.readyState === WebSocket.OPEN) {
-          socket.send(
-            JSON.stringify({
-              type: "voice_transcript",
-              text: finalPayload,
-              timeLeft,
-              inputMethod: "voice",
-            }),
-          );
-        }
-      }, 200);
-    };
-
-    recognition.onend = () => {
-      if (!recognitionRef.current) return;
-      // Rate-limited restart: back off after repeated no-speech errors
-      if (noSpeechCountRef.current >= 5) {
-        console.log("🎤 Too many no-speech errors, backing off 5s...");
-        setTimeout(() => {
-          noSpeechCountRef.current = 0;
-          if (recognitionRef.current) {
-            try {
-              recognitionRef.current.start();
-            } catch {}
-          }
-        }, 5000);
-        return;
-      }
-      try {
-        recognition.start();
-      } catch {}
-    };
-
-    recognition.onerror = (e: any) => {
-      if (e.error === "aborted") return;
-      if (e.error === "no-speech") {
-        noSpeechCountRef.current++;
-        return; // onend will handle restart with backoff
-      }
-      console.log("❌ Recognition Error:", e.error);
-    };
-
-    try {
-      recognition.start();
-    } catch {}
-
-    return () => {
-      recognitionRef.current = null;
-      try {
-        recognition.abort();
-      } catch {}
-    };
-  }, [isPitching, socket, isConnected, isMicMuted, verdictPhase]);
-
   useEffect(() => {
     if (!socket) return;
     if (AUDIO_DEBUG) {
@@ -1977,7 +1833,6 @@ export default function LivePitchRoom() {
             "📨 Incoming:",
             data.type,
             data.speaker ?? "",
-            data.text?.slice(0, 50) ?? "",
           );
         }
 
@@ -2058,7 +1913,6 @@ export default function LivePitchRoom() {
             const matched = aiTip || matchAnswerTip(lastAi?.text);
             if (window.localStorage?.getItem("pn_tips_debug") === "1") {
               console.log("[tips] turn_complete → awaiting", {
-                question: lastAi?.text?.slice(0, 80),
                 tip: matched.term,
                 source: aiTip ? "ai" : "keyword",
               });
@@ -2271,20 +2125,27 @@ export default function LivePitchRoom() {
           // the inter-sentence gaps (see aiTurnActiveRef) so the echo guard
           // stays closed until the turn's clean boundary.
           aiTurnActiveRef.current = true;
-          if (AUDIO_DEBUG) console.log("received audio", data);
+          if (AUDIO_DEBUG) {
+            console.log("received audio", {
+              speaker: data.speaker ?? "",
+              hasAudio: !!data.data,
+              hasText: !!data.text,
+            });
+          }
           if (!window.firstAudioReceived) {
             window.firstAudioReceived = performance.now();
 
-            console.log("🔊 First audio received:", window.firstAudioReceived);
-
-            if (typeof window.firstAudioSent === "number") {
-              console.log(
-                "⏱ Total latency:",
-                window.firstAudioReceived - window.firstAudioSent,
-                "ms",
-              );
-            } else {
-              console.log("⏱ Total latency: firstAudioSent is undefined");
+            if (AUDIO_DEBUG) {
+              console.log("🔊 First audio received:", window.firstAudioReceived);
+              if (typeof window.firstAudioSent === "number") {
+                console.log(
+                  "⏱ Total latency:",
+                  window.firstAudioReceived - window.firstAudioSent,
+                  "ms",
+                );
+              } else {
+                console.log("⏱ Total latency: firstAudioSent is undefined");
+              }
             }
           }
           const hasAudio = !!data.data;
@@ -2475,6 +2336,9 @@ export default function LivePitchRoom() {
           if (statusIntervalRef.current)
             clearInterval(statusIntervalRef.current);
 
+          savedSessionIdRef.current = data.sessionId || null;
+          void attachPendingRecording();
+
           const finalizeNavigation = () => {
             const mockSessionDbRow = {
               id: data.sessionId,
@@ -2497,7 +2361,7 @@ export default function LivePitchRoom() {
 
     socket.addEventListener("message", handleMessage);
     return () => socket.removeEventListener("message", handleMessage);
-  }, [socket, navigate, pitchConfig, activeSpeakerName]);
+  }, [socket, navigate, pitchConfig, activeSpeakerName, attachPendingRecording]);
   const setVideoRefThumb = useCallback(
     (el: HTMLVideoElement | null) => {
       if (el && el.srcObject !== stream) {
@@ -2624,12 +2488,6 @@ export default function LivePitchRoom() {
     setVerdictMessages([]);
     setVerdictCountdown(45);
     wakeAudio();
-
-    // Stop speech recognition and audio capture during verdict phase
-    if (recognitionRef.current) {
-      recognitionRef.current.abort();
-      recognitionRef.current = null;
-    }
 
     // Tell server to trigger sequential verdict speeches from all panelists
     if (socket && socket.readyState === WebSocket.OPEN) {
@@ -2847,14 +2705,9 @@ export default function LivePitchRoom() {
               body: formData,
             });
             const data = await res.json();
-            if (
-              data.videoUrl &&
-              socket &&
-              socket.readyState === WebSocket.OPEN
-            ) {
-              socket.send(
-                JSON.stringify({ type: "set_video_url", url: data.videoUrl }),
-              );
+            if (data.videoUrl) {
+              pendingRecordingRef.current = data.videoUrl;
+              void attachPendingRecording();
             }
           } catch (err) {
             console.error("Audio upload failed:", err);
@@ -3079,13 +2932,10 @@ export default function LivePitchRoom() {
             </p>
           </div>
           <div className="relative">
-            <img
-              src={
-                userData.avatarUrl ||
-                `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.name}`
-              }
-              alt="Avatar"
-              className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-slate-200 dark:border-white/10 bg-sky-100"
+            <UserAvatar
+              name={userData.name}
+              avatarUrl={userData.avatarUrl}
+              className="w-8 h-8 md:w-10 md:h-10 text-xs md:text-sm border-2 border-slate-200 dark:border-white/10"
             />
           </div>
         </div>

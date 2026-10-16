@@ -13,6 +13,7 @@ import {
 import { Logo } from "../components/Logo";
 import { cn } from "../lib/utils";
 import { useAuth } from "../contexts/AuthContext";
+import { getAuthToken } from "../lib/authStorage";
 
 export default function Onboarding() {
   const [step, setStep] = useState(1);
@@ -39,7 +40,7 @@ export default function Onboarding() {
     setIsSubmitting(true);
 
     // Persist onboarding data to the backend
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     try {
       await fetch("/api/profile", {
         method: "POST",
@@ -80,7 +81,7 @@ export default function Onboarding() {
     localStorage.setItem("pitchnest_startup_name", "My Startup");
     localStorage.setItem("pitchnest_funding_stage", "Pre-Seed");
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       await fetch("/api/profile/skip-onboarding", {
         method: "PUT",
         headers: {

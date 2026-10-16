@@ -7,6 +7,14 @@ import React, {
   useRef,
 } from "react";
 import Cookies from "js-cookie";
+import {
+  clearAuthSession,
+  getAuthToken,
+  getStoredUser,
+  storeAuthSession,
+  updateStoredToken,
+  updateStoredUser,
+} from "../lib/authStorage";
 
 export type UserRole = "Founder" | "Investor" | "Advisor";
 
@@ -101,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json().catch(() => null);
       if (data?.token) {
         lastRefreshRef.current = Date.now();
-        localStorage.setItem("token", data.token);
+        updateStoredToken(data.token);
         setToken(data.token);
       }
     } catch {
@@ -119,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const interval = setInterval(
       () => {
-        const currentToken = localStorage.getItem("token");
+        const currentToken = getAuthToken();
         if (!currentToken) return;
         // Only slide the window if the user did something since last refresh
         if (lastActivityRef.current <= lastRefreshRef.current) return;
@@ -137,10 +145,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshSession]);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    const storedToken = localStorage.getItem("token");
+    const storedUser = getStoredUser();
+    const storedToken = getAuthToken();
 
     if (!storedUser || !storedToken) {
+      // Clean up a half-session left by an interrupted write or an old build.
+      clearAuthSession();
       setIsLoading(false);
       return;
     }
@@ -154,24 +164,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const fresh = await res.json().catch(() => null);
           const merged = { ...(stored || {}), ...(fresh || {}) } as User;
           if (!merged.id) {
-            localStorage.removeItem("user");
-            localStorage.removeItem("token");
+            clearAuthSession();
             return;
           }
           setUser(merged);
           setToken(storedToken);
-          localStorage.setItem("user", JSON.stringify(merged));
+          updateStoredUser(merged);
           window.dispatchEvent(new Event("userUpdate"));
           // Returning user is clearly active — restart their expiry window now
           refreshSession(storedToken);
+        } else if (res.status === 401 || res.status === 403) {
+          // Token expired, revoked or no longer eligible — clear everything.
+          clearAuthSession();
         } else {
-          // Token expired or invalid — clear everything
-          localStorage.removeItem("user");
-          localStorage.removeItem("token");
+          // A provider/database outage is not evidence that the credential is
+          // invalid. Keep the local snapshot and let protected APIs fail with
+          // their real 5xx until the service recovers.
+          const stored = safeParse<User>(storedUser);
+          if (stored?.id) {
+            setUser(stored);
+            setToken(storedToken);
+          }
         }
       })
       .catch(() => {
-        // Network error — trust local storage to avoid locking out offline users
+        // Network error — retain the last server-issued identity snapshot.
+        const stored = safeParse<User>(storedUser);
+        if (stored?.id) {
+          setUser(stored);
+          setToken(storedToken);
+        }
       })
       .finally(() => setIsLoading(false));
   }, [refreshSession]);
@@ -185,10 +207,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || data.message || "Login failed");
 
+    storeAuthSession(data.user, data.token, rememberMe);
     setUser(data.user);
     setToken(data.token);
-    localStorage.setItem("user", JSON.stringify(data.user));
-    localStorage.setItem("token", data.token);
   };
   const orgLogin = async (
     email: string,
@@ -203,10 +224,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || data.message || "Login failed");
 
+    storeAuthSession(data.user, data.token, rememberMe);
     setUser(data.user);
     setToken(data.token);
-    localStorage.setItem("user", JSON.stringify(data.user));
-    localStorage.setItem("token", data.token);
   };
 
   const signup = async (
@@ -229,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || data.error || "Signup failed");
+    if (referralCode) Cookies.remove("code");
 
     // Signup no longer logs the user in: the backend requires email
     // verification first and returns NO token (requiresVerification: true).
@@ -236,33 +257,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // this working if the contract ever changes back). Otherwise leave the user
     // logged out; SignupPage routes to /verify.
     if (data?.token) {
+      storeAuthSession(data.user, data.token, false);
       setUser(data.user);
       setToken(data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      localStorage.setItem("token", data.token);
     }
     return data;
   };
 
   const loginWithGoogle = async (credential: string, rememberMe = false) => {
+    const referralCode = Cookies.get("code")?.trim();
     const res = await fetch("/api/auth/google", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ credential, rememberMe }),
+      body: JSON.stringify({
+        credential,
+        rememberMe,
+        ...(referralCode ? { referralCode } : {}),
+      }),
     });
     const data = await res.json();
     if (!res.ok)
       throw new Error(data.message || data.error || "Google sign-in failed");
+    if (referralCode) Cookies.remove("code");
 
+    storeAuthSession(data.user, data.token, rememberMe);
     setUser(data.user);
     setToken(data.token);
-    localStorage.setItem("user", JSON.stringify(data.user));
-    localStorage.setItem("token", data.token);
     return data;
   };
 
   const logout = () => {
-    const currentToken = token || localStorage.getItem("token");
+    const currentToken = token || getAuthToken();
     if (currentToken) {
       void fetch("/api/auth/logout", {
         method: "POST",
@@ -271,8 +296,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(null);
     setToken(null);
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
+    clearAuthSession();
   };
 
   /**
@@ -281,7 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const authFetch = useCallback(
     async (url: string, options: RequestInit = {}): Promise<Response> => {
-      const currentToken = token || localStorage.getItem("token");
+      const currentToken = token || getAuthToken();
 
       const headers = new Headers(options.headers || {});
       if (currentToken) {
@@ -294,8 +318,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (res.status === 401) {
         setUser(null);
         setToken(null);
-        localStorage.removeItem("user");
-        localStorage.removeItem("token");
+        clearAuthSession();
       }
 
       return res;
@@ -306,25 +329,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Refetch user data when the window regains focus so pages show live data
   useEffect(() => {
     const onFocus = () => {
-      const currentToken = localStorage.getItem("token");
+      const currentToken = getAuthToken();
       if (!currentToken) return;
       fetch("/api/auth/me", {
         headers: { Authorization: `Bearer ${currentToken}` },
       })
         .then(async (res) => {
-          if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
             setUser(null);
             setToken(null);
-            localStorage.removeItem("user");
-            localStorage.removeItem("token");
+            clearAuthSession();
             return;
           }
+          if (!res.ok) return;
           const fresh = await res.json().catch(() => null);
           if (!fresh?.id) return;
-          const stored = safeParse<User>(localStorage.getItem("user"));
+          const stored = safeParse<User>(getStoredUser());
           const merged = { ...(stored || {}), ...fresh } as User;
           setUser(merged);
-          localStorage.setItem("user", JSON.stringify(merged));
+          updateStoredUser(merged);
           window.dispatchEvent(new Event("userUpdate"));
         })
         .catch(() => {}); // Ignore network errors silently
@@ -343,7 +366,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * stored copy.
    */
   const refreshUser = useCallback(async () => {
-    const currentToken = localStorage.getItem("token");
+    const currentToken = getAuthToken();
     if (!currentToken) return;
     try {
       const res = await fetch("/api/auth/me", {
@@ -352,10 +375,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) return;
       const fresh = await res.json().catch(() => null);
       if (!fresh?.id) return;
-      const stored = safeParse<User>(localStorage.getItem("user"));
+      const stored = safeParse<User>(getStoredUser());
       const merged = { ...(stored || {}), ...fresh } as User;
       setUser(merged);
-      localStorage.setItem("user", JSON.stringify(merged));
+      updateStoredUser(merged);
       window.dispatchEvent(new Event("userUpdate"));
     } catch {
       // Network blip — keep the current user rather than logging them out.

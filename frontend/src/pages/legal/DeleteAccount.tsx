@@ -71,8 +71,7 @@ export default function DeleteAccount() {
   return (
     <LegalLayout title="Delete Account" lastUpdated={LEGAL_LAST_UPDATED}>
       <p>
-        You can permanently delete your PitchNest account and associated personal data. This page satisfies Apple App
-        Store Guideline 5.1.1(v) and Google Play&apos;s account deletion requirements — it works in a web browser without
+        You can permanently delete your PitchNest account and associated personal data from a web browser without
         reinstalling the app.
       </p>
 
@@ -81,7 +80,8 @@ export default function DeleteAccount() {
         <li>Your account (name, email, password)</li>
         <li>Profile and onboarding data</li>
         <li>Pitch sessions, transcripts, and AI evaluation reports</li>
-        <li>Uploaded pitch decks and session video recordings stored for your account</li>
+        <li>Uploaded pitch decks and session audio recordings stored for your account</li>
+        <li>A business workspace and its published images when it has no other active member</li>
       </ul>
 
       <h2>What may be retained</h2>
@@ -89,16 +89,17 @@ export default function DeleteAccount() {
         <li>Minimal server logs for security and abuse prevention (short retention)</li>
         <li>Data we must keep for legal compliance, if applicable</li>
         <li>Waitlist email if you signed up before creating an account (contact us to remove)</li>
+        <li>Company profile content remains only when another active member shares that business; your membership and public team appearance are removed.</li>
       </ul>
       <p>
-        Deletion is typically completed within <strong>30 days</strong>. You will be signed out immediately after
-        confirmation.
+        Your active account data is removed after successful confirmation and you are signed out immediately. Encrypted
+        backups may retain copies until their normal rotation period ends.
       </p>
 
       <h2>Before you delete</h2>
       <p>
-        If you have an active paid subscription through Apple or Google, cancel it in your device&apos;s subscription
-        settings. Deleting your PitchNest account does not automatically cancel store billing.
+        Deleting your account ends access to any remaining paid period and does not create an automatic refund. Contact{' '}
+        <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> first if you need help with a recent Flutterwave payment.
       </p>
 
       {success ? (

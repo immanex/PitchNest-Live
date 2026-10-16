@@ -5,29 +5,11 @@ import { useAuth } from "../contexts/AuthContext";
 import { useEcosystemFeatures } from "../hooks/useEcosystemFeatures";
 import { usePageMetadata } from "../hooks/usePageMetadata";
 import { BusinessCard } from "../components/discover/BusinessCard";
+import { UserAvatar } from "../components/ui/UserAvatar";
 import { fetchFounder, setFounderFollow, FounderApiError, type PublicFounder } from "../api/founders";
 
-function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
-}
-
 function FounderAvatar({ name, url }: { name: string; url: string | null }) {
-  const [failed, setFailed] = useState(false);
-  if (url && !failed) {
-    return (
-      <img
-        src={url}
-        alt=""
-        onError={() => setFailed(true)}
-        className="h-24 w-24 shrink-0 rounded-full object-cover ring-4 ring-white shadow-md dark:ring-zinc-900"
-      />
-    );
-  }
-  return (
-    <span className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-indigo-500 to-sky-500 text-2xl font-extrabold text-white ring-4 ring-white shadow-md dark:ring-zinc-900">
-      {initials(name)}
-    </span>
-  );
+  return <UserAvatar name={name} avatarUrl={url} size={96} className="ring-4 ring-white shadow-md dark:ring-zinc-900" />;
 }
 
 /**

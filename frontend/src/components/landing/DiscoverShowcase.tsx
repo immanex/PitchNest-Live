@@ -108,7 +108,7 @@ export function DiscoverShowcase({ isLoggedIn }: { isLoggedIn: boolean }) {
             </div>
             <p className="text-xs text-slate-400 dark:text-zinc-500 text-center">
               <ShieldCheck size={13} className="inline-block -mt-0.5 mr-1.5 align-middle" aria-hidden="true" />
-              Your practice sessions, decks and reports always stay private.
+              Your decks, recordings and transcripts never appear publicly; publishing a business is a separate choice.
             </p>
           </SectionReveal>
         )}

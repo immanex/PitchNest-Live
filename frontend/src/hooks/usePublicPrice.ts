@@ -27,6 +27,8 @@ export interface PublicPrice {
   /** Every purchasable (plan, term) SKU, from the server. Drives per-tier price display. */
   catalog: CatalogItem[];
   billingEnabled: boolean;
+  /** Free months a first subscription gets; 0 when there is no offer. */
+  freeMonths: number;
   loaded: boolean;
 }
 
@@ -36,6 +38,7 @@ const EMPTY: PublicPrice = {
   days: null,
   catalog: [],
   billingEnabled: false,
+  freeMonths: 0,
   loaded: false,
 };
 
@@ -55,6 +58,7 @@ export function usePublicPrice(): PublicPrice {
           days: body?.price?.days ?? null,
           catalog: Array.isArray(body?.catalog) ? body.catalog : [],
           billingEnabled: !!body?.billingEnabled,
+          freeMonths: Number.isInteger(body?.offer?.freeMonths) && body.offer.freeMonths > 0 ? body.offer.freeMonths : 0,
           loaded: true,
         });
       })

@@ -116,7 +116,13 @@ export default function PitchReplayScreen() {
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
-            setSession(data[0] || null);
+            const latest = data[0];
+            if (!latest?.id) {
+              setSession(null);
+            } else {
+              const detail = await authFetch(`/api/sessions/${latest.id}`);
+              setSession(detail.ok ? await detail.json() : null);
+            }
           } else {
             setSession(data);
           }

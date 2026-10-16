@@ -77,7 +77,13 @@ export default function PostPitchReport() {
           const data = await res.json();
           // If we fetched the array of sessions because no ID was in query params, take the latest one
           if (Array.isArray(data)) {
-            setSession(data[0] || null);
+            const latest = data[0];
+            if (!latest?.id) {
+              setSession(null);
+            } else {
+              const detail = await authFetch(`/api/sessions/${latest.id}`);
+              setSession(detail.ok ? await detail.json() : null);
+            }
           } else {
             setSession(data);
           }
@@ -490,10 +496,10 @@ export default function PostPitchReport() {
         <div className="space-y-6">
           <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm">
             <h3 className="text-sm font-extrabold flex items-center gap-2 mb-4"><Play className="text-slate-900 dark:text-white" size={16} /> Pitch Replay</h3>
-            {/* Video replay is disabled for now — clean placeholder, no fake player. */}
+            {/* Pitch recordings are audio-only; replay lives on the dedicated screen. */}
             <div className="aspect-video bg-slate-900 rounded-xl overflow-hidden relative mb-4 flex flex-col items-center justify-center gap-2 text-center px-4">
               <Play size={22} className="text-white/30" />
-              <span className="text-white/80 text-xs font-bold">Video replay coming soon</span>
+              <span className="text-white/80 text-xs font-bold">Audio replay is available from My Pitches</span>
             </div>
             {/* MVP: replay coming soon — restore Link to /replay when re-enabled */}
             <div className="w-full py-3 bg-slate-50 dark:bg-zinc-800/50 text-slate-400 dark:text-zinc-500 font-bold rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-100 dark:border-zinc-800 select-none cursor-default">

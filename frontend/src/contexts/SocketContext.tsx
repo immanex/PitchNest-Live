@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { getAuthToken } from '../lib/authStorage';
 
 interface SocketContextType {
   socket: WebSocket | null;
@@ -48,6 +49,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // configured custom path, but normalize bare origins to the protected path.
     try {
       const parsed = new URL(WS_URL);
+      const local = ['localhost', '127.0.0.1', '0.0.0.0'].includes(parsed.hostname);
+      if (
+        (parsed.protocol !== 'wss:' && !(local && parsed.protocol === 'ws:')) ||
+        parsed.username ||
+        parsed.password ||
+        parsed.search ||
+        parsed.hash
+      ) {
+        throw new Error('Unsafe WebSocket URL');
+      }
       if (!parsed.pathname || parsed.pathname === '/') parsed.pathname = '/ws';
       WS_URL = parsed.toString();
     } catch {
@@ -57,7 +68,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Browser WebSockets cannot set Authorization. Offer the JWT as a protocol
     // token so it never appears in the URL, proxy logs or browser history.
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token) return;
 
     const ws = new WebSocket(WS_URL, ['pitchnest-v1', `pitchnest-auth.${token}`]);

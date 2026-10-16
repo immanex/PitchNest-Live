@@ -36,6 +36,7 @@ import { PublicPitchPanel } from "../components/business/PublicPitchPanel";
 import { BusinessMediaPanel } from "../components/business/BusinessMediaPanel";
 import { MyPublicProfile } from "../components/business/MyPublicProfile";
 import { BusinessLogo } from "../components/discover/BusinessRow";
+import { UserAvatar } from "../components/ui/UserAvatar";
 import { useEcosystemFeatures } from "../hooks/useEcosystemFeatures";
 import {
   archiveBusiness,
@@ -1234,11 +1235,7 @@ export default function BusinessWorkspace() {
                       <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500 dark:bg-zinc-800/60 dark:text-zinc-400">{membersError}</p>
                     ) : members.map((member) => (
                       <div key={member.userId} className="flex items-center gap-3">
-                        {member.avatarUrl ? (
-                          <img src={member.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300">{member.name.slice(0, 1).toUpperCase()}</span>
-                        )}
+                        <UserAvatar name={member.name} avatarUrl={member.avatarUrl} size={32} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs font-bold text-slate-800 dark:text-zinc-200">{member.name}</p>
                           <p className="truncate text-[10px] text-slate-400">{member.email || titleCase(member.role)}</p>

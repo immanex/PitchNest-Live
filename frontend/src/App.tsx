@@ -16,6 +16,7 @@ import { lazyPage } from "./lib/lazyPage";
 import { SocketProvider } from "./contexts/SocketContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { getAuthToken, getStoredUser } from "./lib/authStorage";
 import { OrganizationProtectedRoute } from "./components/OrganizationProtectedRoute";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { BillingProvider } from "./contexts/BillingContext";
@@ -31,7 +32,13 @@ const Onboarding = lazyPage(() => import("./pages/Onboarding"));
 const VerifyEmail = lazyPage(() => import("./components/VerifyEmail"));
 const Dashboard = lazyPage(() => import("./pages/Dashboard"));
 // const Analytics = lazyPage(() => import("./pages/Analytics")); // MVP: coming soon
-const SettingsPage = lazyPage(() => import("./pages/SettingsPage"));
+const SettingsLayout = lazyPage(() => import("./pages/settings/SettingsLayout"));
+const ProfileSettings = lazyPage(() => import("./pages/settings/ProfileSection"));
+const AccountSettings = lazyPage(() => import("./pages/settings/AccountSection"));
+const AppearanceSettings = lazyPage(() => import("./pages/settings/AppearanceSection"));
+const NotificationSettings = lazyPage(() => import("./pages/settings/NotificationsSection"));
+const VoiceSettings = lazyPage(() => import("./pages/settings/VoiceSection"));
+const BillingSettings = lazyPage(() => import("./pages/settings/BillingSection"));
 const LivePitchRoom = lazyPage(() => import("./pages/LivePitchRoom"));
 const PostPitchReport = lazyPage(() => import("./pages/PostPitchReport"));
 const PrePitchSetup = lazyPage(() => import("./pages/PrePitchSetup"));
@@ -189,7 +196,6 @@ export default function App() {
               />
               {/* MVP: coming soon — redirect to dashboard until re-enabled */}
               <Route path="/analytics" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/settings" element={<SettingsPage />} />
               <Route
                 path="/workspace/businesses"
                 element={
@@ -250,6 +256,28 @@ export default function App() {
             </Route>
 
             {/* Special Full-screen Routes (No Sidebar) */}
+
+            {/* Settings has its own frame: a section menu with "Back to app"
+                in place of the app sidebar. /settings alone is the section
+                list on phones and opens Profile on wider screens. */}
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <ErrorBoundary>
+                    <SettingsLayout />
+                  </ErrorBoundary>
+                </ProtectedRoute>
+              }
+            >
+              <Route path="profile" element={<ProfileSettings />} />
+              <Route path="account" element={<AccountSettings />} />
+              <Route path="appearance" element={<AppearanceSettings />} />
+              <Route path="notifications" element={<NotificationSettings />} />
+              <Route path="voice" element={<VoiceSettings />} />
+              <Route path="billing" element={<BillingSettings />} />
+              <Route path="*" element={<Navigate to="/settings" replace />} />
+            </Route>
 
             <Route
               path="/onboarding"
@@ -312,8 +340,8 @@ export default function App() {
 /** True when this browser holds a founder session (organizations excluded). */
 function hasStoredFounderSession() {
   try {
-    if (!localStorage.getItem("token")) return false;
-    const stored = JSON.parse(localStorage.getItem("user") || "null");
+    if (!getAuthToken()) return false;
+    const stored = JSON.parse(getStoredUser() || "null");
     return Boolean(stored?.id) && stored.accountType !== "organization";
   } catch {
     return false;

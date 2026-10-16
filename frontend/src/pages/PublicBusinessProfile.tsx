@@ -36,27 +36,11 @@ import { createPracticeDraft } from "../api/practice";
 import { BusinessDiscussion, type ComposeRequest } from "../components/discover/BusinessDiscussion";
 import { PublicPitchSection } from "../components/discover/PublicPitchSection";
 import { BusinessLogo } from "../components/discover/BusinessRow";
+import { UserAvatar } from "../components/ui/UserAvatar";
 
 /** A consenting member's photo, or their initials if they have none. */
 function TeamAvatar({ name, url }: { name: string; url: string | null }) {
-  const [failed, setFailed] = React.useState(false);
-  if (url && !failed) {
-    return (
-      <img
-        src={url}
-        alt=""
-        loading="lazy"
-        onError={() => setFailed(true)}
-        className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-slate-200 dark:ring-zinc-700"
-      />
-    );
-  }
-  const letters = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-  return (
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-      {letters || "?"}
-    </span>
-  );
+  return <UserAvatar name={name} avatarUrl={url} size={40} className="ring-1 ring-slate-200 dark:ring-zinc-700" />;
 }
 import { fetchPublicPitch, type FeedbackCategory, type PublicPitch } from "../api/pitches";
 import { ReportDialog, type ReportTarget } from "../components/discover/ReportDialog";

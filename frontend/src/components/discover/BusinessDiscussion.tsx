@@ -13,6 +13,7 @@ import {
 import { FEEDBACK_CATEGORIES, FEEDBACK_LABELS, FEEDBACK_PROMPTS } from "../../api/pitches";
 import type { ReportTarget } from "./ReportDialog";
 import { FeedbackBadge } from "./FeedbackBadge";
+import { UserAvatar } from "../ui/UserAvatar";
 
 /** Asks the composer to preset a feedback type and take focus. */
 export interface ComposeRequest {
@@ -31,10 +32,6 @@ interface BusinessDiscussionProps {
   /** The business has a live public pitch, so feedback types are offered. */
   pitchAvailable?: boolean;
   composeRequest?: ComposeRequest | null;
-}
-
-function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "P";
 }
 
 function relativeTime(value: string) {
@@ -308,19 +305,7 @@ export function BusinessDiscussion({
           <ul className="divide-y divide-slate-100 dark:divide-zinc-800">
             {comments.map((comment) => (
               <li key={comment.id} className="flex gap-3 py-4">
-                {comment.author.avatarUrl ? (
-                  <img
-                    src={comment.author.avatarUrl}
-                    alt=""
-                    className="h-9 w-9 shrink-0 rounded-full object-cover"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
-                    {initials(comment.author.name)}
-                  </span>
-                )}
+                <UserAvatar name={comment.author.name} avatarUrl={comment.author.avatarUrl} size={36} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="text-sm font-bold text-slate-900 dark:text-zinc-100">{comment.author.name}</span>

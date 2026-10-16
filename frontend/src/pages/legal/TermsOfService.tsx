@@ -49,6 +49,10 @@ export default function TermsOfService() {
         You represent that you have the right to upload your content and that it does not infringe third-party rights or
         violate law.
       </p>
+      <p>
+        Content in a shared business workspace remains available to its other active members if you leave or delete your
+        account. Your membership and public team identity are removed. A workspace with no other active member is deleted.
+      </p>
 
       <h2>6. Acceptable use</h2>
       <p>You agree not to:</p>
@@ -61,10 +65,10 @@ export default function TermsOfService() {
 
       <h2>7. Subscriptions and payments</h2>
       <p>
-        If paid plans are offered, pricing and billing terms will be shown at purchase. Subscriptions through Apple App
-        Store or Google Play are subject to their respective payment and refund policies. Deleting your account does not
-        automatically cancel an active store subscription — you must cancel separately in your device subscription
-        settings.
+        Paid access periods, prices, currencies, and durations are shown before purchase and processed through
+        Flutterwave&apos;s hosted checkout. Card details are handled by Flutterwave rather than PitchNest. Deleting an
+        account ends access to any remaining paid period and does not itself create a refund; contact support for payment
+        questions.
       </p>
 
       <h2>8. Intellectual property</h2>

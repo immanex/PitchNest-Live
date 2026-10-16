@@ -3,7 +3,7 @@ services:
     name: pitchnest-backend
     runtime: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /health
     plan: free
@@ -11,15 +11,17 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 24.21.0
       - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_ANON_KEY
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      # The frontend's Cloudflare Pages address (or custom domain), no trailing
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      # The frontend's Vercel address (or custom domain), no trailing
       # slash. CORS accepts only exact origins; "*" is not honoured.
       - key: ALLOWED_ORIGIN
         sync: false
@@ -38,7 +40,9 @@ services:
       - key: AZURE_OPENAI_DEPLOYMENT
         sync: false
       - key: AZURE_OPENAI_API_VERSION
-        value: 2026-07-09
+        value: 2024-10-21
+      - key: OPENAI_API_KEY
+        sync: false
       # Optional: Pro coaching model and reasoning effort (src/config/aiModels.ts).
       # Empty means Pro uses AZURE_OPENAI_DEPLOYMENT. Scoring never changes by plan.
       - key: AZURE_OPENAI_DEPLOYMENT_ADVANCED
@@ -49,6 +53,50 @@ services:
         sync: false
       - key: AZURE_SPEECH_REGION
         sync: false
+      - key: STT_DEFAULT_LOCALE
+        value: en-NG
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_REPLY_TO
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: pitchnest-media
+      - key: SUPABASE_AVATAR_BUCKET
+        value: pitchnest-avatars
+      - key: SUPABASE_PUBLIC_MEDIA_BUCKET
+        value: pitchnest-avatars
+      - key: FLW_SECRET_KEY
+        sync: false
+      - key: FLW_PUBLIC_KEY
+        sync: false
+      - key: FLW_WEBHOOK_HASH
+        sync: false
+      - key: PRO_PLAN_AMOUNT
+        sync: false
+      - key: PRO_PLAN_CURRENCY
+        value: USD
+      - key: PRO_PLAN_DAYS
+        value: "30"
+      - key: FIRST_SUBSCRIPTION_FREE_MONTHS
+        value: "1"
+      - key: FOUNDER_PLAN_AMOUNT
+        sync: false
+      - key: FOUNDER_ANNUAL_AMOUNT
+        sync: false
+      - key: PRO_ANNUAL_AMOUNT
+        sync: false
+      - key: PRO_ANNUAL_DAYS
+        value: "365"
+      - key: RESEARCH_ENABLED
+        value: "false"
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: SERPER_API_KEY
+        sync: false
+      - key: TRIAL_JOBS_ENABLED
+        value: "true"
       - key: PUBLIC_SITE_URL
         sync: false
       # Discover engagement stays dark until migration 0021 is applied and a

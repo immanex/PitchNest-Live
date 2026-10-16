@@ -2,7 +2,7 @@
 export const CONTACT_EMAIL = 'pitchnestapp@gmail.com';
 export const APP_NAME = 'PitchNest';
 export const MIN_AGE = 13;
-export const LEGAL_LAST_UPDATED = 'May 29, 2026';
+export const LEGAL_LAST_UPDATED = 'October 16, 2026';
 
 /** Public legal page paths (for store console URLs: https://YOUR_DOMAIN + path) */
 export const LEGAL_PATHS = {

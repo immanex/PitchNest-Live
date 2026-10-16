@@ -1,3 +1,5 @@
+import { getAuthToken } from "./authStorage";
+
 /**
  * First-party, privacy-safe page-view analytics (backend: services/eventService.ts).
  *
@@ -33,7 +35,7 @@ export function trackEvent(event: ClientEvent): void {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     // Attributes the view to the signed-in account when there is one; the
     // server ignores invalid or organization tokens.
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     if (token) headers.Authorization = `Bearer ${token}`;
     void fetch("/api/public/events", {
       method: "POST",

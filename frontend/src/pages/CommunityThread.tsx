@@ -3,6 +3,7 @@ import { ArrowLeft, Flag, Loader2, MessageSquare, MessagesSquare, Send, Trash2 }
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { PageWithRail } from "../components/layout/EcosystemRail";
 import { ReportDialog, type ReportTarget } from "../components/discover/ReportDialog";
+import { UserAvatar } from "../components/ui/UserAvatar";
 import { useAuth } from "../contexts/AuthContext";
 import { usePageMetadata } from "../hooks/usePageMetadata";
 import {
@@ -18,10 +19,6 @@ import {
   type ThreadDetail,
 } from "../api/community";
 
-function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "P";
-}
-
 function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
@@ -30,13 +27,7 @@ function formatDate(value: string) {
 }
 
 function Avatar({ name, url }: { name: string; url: string | null }) {
-  return url ? (
-    <img src={url} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
-  ) : (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
-      {initials(name)}
-    </span>
-  );
+  return <UserAvatar name={name} avatarUrl={url} size={36} />;
 }
 
 export default function CommunityThread() {

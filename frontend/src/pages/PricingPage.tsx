@@ -1,21 +1,27 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, Hammer, Minus, Sparkles } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Check, Gift, Hammer, Loader2, Minus, Sparkles, Users, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LogoLink } from "../components/Logo";
-import { getPlans, IN_DEVELOPMENT } from "../lib/plans";
+import { getPlans, IN_DEVELOPMENT, type Plan } from "../lib/plans";
 import { usePublicPrice } from "../hooks/usePublicPrice";
+import { useAuth } from "../contexts/AuthContext";
+import { useBilling, type BillingTerm, type PaidPlan } from "../contexts/BillingContext";
+import { formatMoney, freeMonthsLabel, hasPaidPlan } from "../lib/billing";
+import { CONTACT_EMAIL } from "../lib/legal";
 
 /**
- * Standalone pricing page.
- *
- * The landing page carries a condensed three-card summary; this is the detail
- * view it links into. Both read the same catalogue (lib/plans.ts) and the same
- * server-provided price, so they cannot drift apart.
+ * Plans and the first-subscription offer.
  *
  * Public by design — someone deciding whether to sign up must be able to read
- * the full plan comparison without an account.
+ * the full plan comparison without an account. Signed in, each card starts
+ * checkout for its plan directly.
+ *
+ * Every price and the free-month offer come from the server (the public price
+ * endpoint, or the signed-in user's plan endpoint, which also says whether
+ * THIS user still qualifies). Nothing here can promise what checkout won't
+ * record.
  */
 
 /**
@@ -31,15 +37,6 @@ import { usePublicPrice } from "../hooks/usePublicPrice";
  * prescriptive half — "Reading the Room" and "Actionable Next Steps" — is blurred
  * for anyone without live research, i.e. for Free AND for a paying Founder. So
  * that row is Pro-only, and the score row above it is genuinely open to all.
- * An earlier version of this table claimed prioritised fixes were included
- * everywhere, which was simply not what the screen showed.
- *
- * That is a deliberate correction, not the only one. The matrix previously sold
- * "2 Personas" on Free against "3" on Founder and held the multi-VC panel back for
- * Pro, while nothing in the code gated either one; and the "Basic" vs "Detailed"
- * score split was fiction. Rows for unbuilt features are gone from this table
- * entirely and live in the roadmap section below, where they are not printed in
- * the same column as a price.
  */
 type Cellv = string | boolean;
 const MATRIX: { label: string; free: Cellv; founder: Cellv; pro: Cellv; enterprise: Cellv }[] = [
@@ -59,6 +56,15 @@ const MATRIX: { label: string; free: Cellv; founder: Cellv; pro: Cellv; enterpri
   { label: "Enrolment link & QR for your founders", free: false, founder: false, pro: false, enterprise: true },
 ];
 
+const DESCRIPTIONS: Record<"free" | "founder" | "pro", string> = {
+  free: "Rehearse with the full AI investor panel and see where your pitch stands.",
+  founder: "Practise as often as you need, with longer sessions and a report to keep.",
+  pro: "Everything for an active raise: the longest sessions, live market research and prioritised next steps.",
+};
+
+const CARD_PLAN: Record<"founder" | "pro", PaidPlan> = { founder: "prep", pro: "pro" };
+const RANK: Record<string, number> = { free: 0, prep: 1, pro: 2 };
+
 function Cell({ value }: { value: string | boolean }) {
   if (value === true) return <Check size={16} className="mx-auto text-emerald-500" aria-label="Included" />;
   if (value === false) return <Minus size={16} className="mx-auto text-slate-300 dark:text-zinc-700" aria-label="Not included" />;
@@ -66,167 +72,245 @@ function Cell({ value }: { value: string | boolean }) {
 }
 
 export default function PricingPage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const signedIn = Boolean(user && user.accountType !== "organization");
   const publicPrice = usePublicPrice();
-  const plans = useMemo(() => getPlans(publicPrice), [publicPrice]);
-  // Per-tier monthly prices, straight from the server catalog. When the catalog
-  // has not answered, these are null and the page shows a neutral "—" rather
-  // than a hardcoded amount that could disagree with what checkout charges.
-  const founderAmt =
-    publicPrice.catalog.find((c) => c.plan === "prep" && c.term === "monthly")?.amount ?? null;
-  const proAmt =
-    publicPrice.catalog.find((c) => c.plan === "pro" && c.term === "monthly")?.amount ??
-    publicPrice.amount ??
-    null;
-  /** "$9.99" or "—". Never a number the server did not send. */
-  const money = (n: number | null) => (n === null ? "—" : `$${n}`);
-  /** "Founder ($9.99)", or just "Founder" while the price is unknown. */
-  const tier = (name: string, n: number | null) => (n === null ? name : `${name} ($${n})`);
+  const { info, loaded, upgrade } = useBilling();
+  const [term, setTerm] = useState<BillingTerm>("monthly");
+  const [starting, setStarting] = useState<PaidPlan | null>(null);
 
-  useEffect(() => {
-    if (localStorage.getItem("user")) setIsLoggedIn(true);
-  }, []);
+  const useAccount = signedIn && loaded;
+  const catalog = useAccount && info.catalog.length > 0 ? info.catalog : publicPrice.catalog;
+  const billingEnabled = useAccount ? info.billingEnabled : publicPrice.billingEnabled;
+  // Visitors see the offer as it stands for new subscribers; a signed-in user
+  // sees it only while they still qualify.
+  const freeMonths = useAccount
+    ? info.offer.eligible ? info.offer.freeMonths : 0
+    : publicPrice.freeMonths;
+  const paid = useAccount && hasPaidPlan(info);
+  const currentPlan = paid ? info.plan : "free";
+  const currentSub = useAccount && info.subscription?.autoRenew ? info.subscription : null;
+
+  const plans = useMemo(() => getPlans({ amount: null, currency: null, days: null }), []);
+  const sku = (plan: PaidPlan, t: BillingTerm) => catalog.find((c) => c.plan === plan && c.term === t) ?? null;
+
+  const proMonthly = sku("pro", "monthly");
+  const proAnnual = sku("pro", "annual");
+  const annualSaving =
+    proMonthly && proAnnual && proAnnual.amount < proMonthly.amount * 12
+      ? Math.round((1 - proAnnual.amount / (proMonthly.amount * 12)) * 100)
+      : 0;
+
+  const close = () => {
+    if ((window.history.state?.idx ?? 0) > 0) navigate(-1);
+    else navigate(signedIn ? "/home" : "/");
+  };
+
+  const startCheckout = async (plan: PaidPlan) => {
+    setStarting(plan);
+    // On success the browser leaves for Flutterwave, so only failure clears this.
+    const ok = await upgrade({ plan, term });
+    if (!ok) setStarting(null);
+  };
+
+  const ctaFor = (plan: Plan) => {
+    const buttonBase =
+      "flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold transition-colors";
+    const quiet = cn(buttonBase, "border border-slate-200 text-slate-400 dark:border-zinc-700 dark:text-zinc-500 cursor-default");
+
+    if (plan.id === "free") {
+      if (!signedIn) {
+        return <Link to="/signup" className={cn(buttonBase, "border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-800")}>Start free</Link>;
+      }
+      return <span className={quiet}>{currentPlan === "free" ? "Your current plan" : "Included"}</span>;
+    }
+    if (plan.id === "enterprise") return null;
+
+    const target = CARD_PLAN[plan.id];
+    const featured = plan.id === "pro";
+    const action = cn(
+      buttonBase,
+      featured
+        ? "bg-linear-to-r from-indigo-600 to-sky-600 text-white shadow-md shadow-sky-600/25 hover:brightness-110"
+        : "border border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50 dark:border-indigo-500/40 dark:bg-transparent dark:text-indigo-200 dark:hover:bg-indigo-500/10",
+    );
+    const label = freeMonths > 0 ? `Claim ${freeMonthsLabel(freeMonths)}` : plan.id === "pro" ? "Upgrade to Pro Founder" : "Get Founder";
+
+    if (!signedIn) return <Link to="/signup" className={action}>{label}</Link>;
+    if (currentSub && currentSub.plan === target && currentSub.term === term) {
+      return <span className={quiet}>Your current plan</span>;
+    }
+    if (paid && RANK[currentPlan] > RANK[target]) return <span className={quiet}>Included in your plan</span>;
+    if (!billingEnabled) {
+      return <a href={`mailto:${CONTACT_EMAIL}?subject=Upgrade%20my%20PitchNest%20plan`} className={action}>Contact us to upgrade</a>;
+    }
+    const switching = Boolean(currentSub && currentSub.plan === target);
+    return (
+      <button type="button" onClick={() => void startCheckout(target)} disabled={starting !== null} className={cn(action, "cursor-pointer disabled:opacity-60")}>
+        {starting === target && <Loader2 size={15} className="animate-spin" />}
+        {switching ? `Switch to ${term === "annual" ? "yearly" : "monthly"}` : label}
+      </button>
+    );
+  };
+
+  const priceFor = (plan: Plan) => {
+    if (plan.id === "free") return { amount: "$0", unit: "/ month" };
+    if (plan.id === "enterprise") return { amount: "Custom", unit: "per seat" };
+    const item = sku(CARD_PLAN[plan.id], term);
+    if (!item) return { amount: "—", unit: "" };
+    return { amount: formatMoney(item.amount, item.currency), unit: term === "annual" ? "/ year" : "/ month" };
+  };
+
+  const cards = plans.filter((p) => p.id !== "enterprise");
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#09090B] font-sans text-slate-900 dark:text-zinc-100">
+    <div className="gradient-mesh min-h-screen font-sans text-slate-900 dark:text-zinc-100">
       <header className="border-b border-slate-100 dark:border-zinc-800/60">
-        <nav className="max-w-295 mx-auto px-5 sm:px-7 h-16 flex justify-between items-center">
+        <nav className="mx-auto flex h-16 max-w-295 items-center justify-between px-5 sm:px-7">
           <LogoLink showText size="md" />
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            {isLoggedIn ? (
-              <Link to="/dashboard" className="btn-primary text-sm px-5 py-2.5">Dashboard</Link>
+            {signedIn ? (
+              <button
+                type="button"
+                onClick={close}
+                aria-label="Close plans"
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              >
+                <X size={20} />
+              </button>
             ) : (
               <>
                 <Link to="/login" className="btn-ghost hidden sm:inline-flex">Log in</Link>
-                <Link to="/signup" className="btn-primary text-sm px-5 py-2.5">Start free</Link>
+                <Link to="/signup" className="btn-primary px-5 py-2.5 text-sm">Start free</Link>
               </>
             )}
           </div>
         </nav>
       </header>
 
-      <main className="max-w-295 mx-auto px-5 sm:px-7 py-10 sm:py-14">
-        <Link to="/" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 mb-6">
-          <ArrowLeft size={14} /> Back to home
-        </Link>
-
-        <div className="text-center mb-10">
-          <p className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-2">BUSINESS MODEL</p>
-          <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 dark:text-zinc-100 mb-3 tracking-tight">
-            A freemium ladder that scales from solo founder to full cohort.
+      <main className="mx-auto max-w-295 px-5 py-10 sm:px-7 sm:py-14">
+        <div className="mb-8 text-center">
+          <p className="eyebrow mb-3">Plans & pricing</p>
+          <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+            {freeMonths > 0 ? `Get your first ${freeMonths === 1 ? "month" : `${freeMonths} months`} free` : "Choose your plan"}
           </h1>
-          <p className="text-sm sm:text-base text-slate-600 dark:text-zinc-400 max-w-2xl mx-auto">
-            Everything is unlocked for free during our 30-day testing access. Choose the plan that fits your fundraising stage.
+          <p className="mx-auto mt-3 max-w-xl text-sm text-slate-500 dark:text-zinc-400 sm:text-base">
+            {freeMonths > 0
+              ? `Subscribe to any plan and we add ${freeMonthsLabel(freeMonths).replace(" free", "")} on top. Plans renew automatically and you can cancel any time.`
+              : "Plans renew automatically and you can cancel any time."}
           </p>
         </div>
 
+        {/* Billing period */}
+        <div className="mb-10 flex justify-center">
+          <div role="radiogroup" aria-label="Billing period" className="inline-flex rounded-full border border-slate-200 bg-white/70 p-1 dark:border-zinc-800 dark:bg-zinc-900/70">
+            {(["monthly", "annual"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                role="radio"
+                aria-checked={term === option}
+                onClick={() => setTerm(option)}
+                className={cn(
+                  "cursor-pointer rounded-full px-5 py-2 text-sm font-medium transition-colors",
+                  term === option
+                    ? "bg-indigo-50 font-semibold text-indigo-700 shadow-sm dark:bg-indigo-500/20 dark:text-indigo-100"
+                    : "text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200",
+                )}
+              >
+                {option === "monthly" ? "Monthly" : "Yearly"}
+                {option === "annual" && annualSaving > 0 && (
+                  <span className="ml-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">Save {annualSaving}%</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Plan cards */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-14 items-stretch">
-          {plans.map((plan) => {
-            const isPro = plan.id === "pro";
+        <div className="mx-auto mb-10 grid max-w-5xl items-stretch gap-5 md:grid-cols-3">
+          {cards.map((plan) => {
+            const featured = plan.id === "pro";
+            const price = priceFor(plan);
+            const paidCard = plan.id === "founder" || plan.id === "pro";
+            const recurring = paidCard ? sku(CARD_PLAN[plan.id as "founder" | "pro"], term) : null;
             return (
               <div
                 key={plan.id}
                 className={cn(
-                  "rounded-2xl p-6 flex flex-col transition-all",
-                  isPro
-                    ? "bg-[#131B38] text-white border-2 border-amber-500/70 shadow-2xl shadow-amber-500/10 sm:-translate-y-2"
-                    : "bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm",
+                  "flex flex-col rounded-3xl border p-6 sm:p-7",
+                  // On a phone the offer card leads; side by side it sits last.
+                  featured && "order-first md:order-none",
+                  featured
+                    ? "border-indigo-300 bg-linear-to-b from-indigo-50 to-white shadow-xl shadow-indigo-500/10 dark:border-indigo-500/40 dark:from-indigo-950/60 dark:to-zinc-900/80 dark:shadow-none"
+                    : "border-slate-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/60",
                 )}
               >
-                {isPro && (
-                  <div className="w-full text-center -mt-2 mb-2">
-                    <span className="inline-block bg-[#E89234] text-slate-950 font-black tracking-widest text-[9px] uppercase py-1 px-3.5 rounded-full shadow-sm">
-                      MOST POPULAR
+                <div className="flex h-6 items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-slate-700 dark:text-zinc-300">{plan.name}</p>
+                  {featured && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent-ink">
+                      {freeMonths > 0 ? <><Gift size={11} /> {freeMonthsLabel(freeMonths)}</> : "Most popular"}
                     </span>
-                  </div>
-                )}
-                
-                <h2 className={cn("text-base font-extrabold mb-1", isPro ? "text-white" : "text-slate-900 dark:text-zinc-100")}>
-                  {plan.name}
-                </h2>
-
-                <div className="mb-4 flex items-baseline gap-1">
-                  {plan.id === "free" ? (
-                    <>
-                      <span className="text-3xl font-extrabold text-amber-600 dark:text-amber-500">$0</span>
-                      <span className={cn("text-xs font-medium", isPro ? "text-slate-300" : "text-slate-500 dark:text-zinc-400")}>/mo</span>
-                    </>
-                  ) : plan.id === "founder" ? (
-                    <>
-                      <span className="text-3xl font-extrabold text-amber-600 dark:text-amber-500">{money(founderAmt)}</span>
-                      {founderAmt !== null && <span className={cn("text-xs font-medium", isPro ? "text-slate-300" : "text-slate-500 dark:text-zinc-400")}>/mo</span>}
-                    </>
-                  ) : plan.id === "pro" ? (
-                    <>
-                      <span className="text-3xl font-extrabold text-[#F59E0B]">{money(proAmt)}</span>
-                      {proAmt !== null && <span className="text-xs font-medium text-slate-300">/mo</span>}
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-2xl font-extrabold text-amber-600 dark:text-amber-500">Custom</span>
-                      <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">per seat</span>
-                    </>
                   )}
                 </div>
+                <h2 className="mt-4 text-2xl font-semibold tracking-tight">{plan.headline}</h2>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-zinc-400 md:min-h-[4.5rem]">
+                  {DESCRIPTIONS[plan.id as "free" | "founder" | "pro"]}
+                </p>
 
-                <ul className={cn("space-y-2.5 text-xs sm:text-sm mb-6 flex-1", isPro ? "text-slate-200" : "text-slate-600 dark:text-zinc-400")}>
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2">
-                      <Check size={15} className={cn("shrink-0 mt-0.5", isPro ? "text-[#F59E0B]" : "text-amber-500")} />
-                      <span>{f}</span>
+                <div className="mt-5 flex items-baseline gap-1.5">
+                  <span className="text-4xl font-semibold tracking-tight">{price.amount}</span>
+                  <span className="text-sm text-slate-500 dark:text-zinc-400">{price.unit}</span>
+                </div>
+                <p className="mt-1 h-5 text-xs font-semibold text-accent-text dark:text-accent">
+                  {paidCard && freeMonths > 0 ? `+ ${freeMonthsLabel(freeMonths)} on your first subscription` : ""}
+                </p>
+
+                <div className="mt-5">{ctaFor(plan)}</div>
+
+                <ul className="mt-6 flex-1 space-y-3">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-zinc-300">
+                      <Check size={16} className={cn("mt-0.5 shrink-0", featured ? "text-indigo-600 dark:text-indigo-300" : "text-sky-600/70 dark:text-sky-400/70")} />
+                      <span>{feature}</span>
                     </li>
                   ))}
                 </ul>
 
-                <div className="mb-4">
-                  {!plan.available ? (
-                    <span className={cn(
-                      "block w-full py-2.5 rounded-xl border text-center text-xs font-bold cursor-default",
-                      isPro ? "border-slate-700 text-slate-400" : "border-slate-200 dark:border-zinc-700 text-slate-400 dark:text-zinc-500"
-                    )}>
-                      {plan.cta.label}
-                    </span>
-                  ) : (
-                    <Link
-                      to={plan.cta.href}
-                      className={cn(
-                        "flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl text-xs font-bold transition-all",
-                        isPro
-                          ? "bg-amber-500 text-slate-950 hover:bg-amber-400 font-black shadow-md shadow-amber-500/20"
-                          : "border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800",
-                      )}
-                    >
-                      {plan.cta.label} <ArrowRight size={14} />
-                    </Link>
-                  )}
-                </div>
-
-                <p className={cn(
-                  "text-[11px] italic text-center pt-3 border-t",
-                  isPro
-                    ? "text-amber-400/90 border-white/10"
-                    : "text-amber-700/80 dark:text-amber-400/80 border-slate-100 dark:border-zinc-800"
-                )}>
-                  {plan.tagline}
+                <p className="mt-6 text-[11px] leading-relaxed text-slate-400 dark:text-zinc-500">
+                  {plan.id === "free"
+                    ? "No card needed. New accounts start with 30 days of full Pro access."
+                    : recurring
+                      ? `${freeMonths > 0 ? "The free month applies to your first subscription only. " : ""}Renews at ${formatMoney(recurring.amount, recurring.currency)} ${term === "annual" ? "a year" : "a month"} until you cancel.`
+                      : "Renews automatically until you cancel."}
                 </p>
               </div>
             );
           })}
         </div>
 
+        <p className="mb-16 flex flex-wrap items-center justify-center gap-1.5 text-center text-sm text-slate-500 dark:text-zinc-400">
+          <Users size={16} className="text-slate-400" />
+          Running an accelerator, hub or cohort?
+          <Link to="/support" className="font-semibold text-slate-900 underline underline-offset-4 hover:text-indigo-700 dark:text-zinc-100 dark:hover:text-indigo-300">
+            See Hubs & Accelerators
+          </Link>
+        </p>
+
         {/* Full comparison */}
-        <h2 className="text-base font-extrabold text-slate-900 dark:text-zinc-100 mb-3">Compare in detail</h2>
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-zinc-800">
+        <h2 className="mb-3 text-base font-semibold">Compare plans in detail</h2>
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/60">
           <table className="w-full min-w-140 text-sm">
             <thead>
-              <tr className="bg-slate-50 dark:bg-zinc-900/60 border-b border-slate-200 dark:border-zinc-800">
-                <th scope="col" className="text-left font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-4 py-3">Feature</th>
-                <th scope="col" className="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-4 py-3 w-28">Free ($0)</th>
-                <th scope="col" className="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-4 py-3 w-28">{tier("Founder", founderAmt)}</th>
-                <th scope="col" className="font-bold text-xs uppercase tracking-wider text-amber-600 dark:text-amber-400 px-4 py-3 w-32">{tier("Pro Founder", proAmt)}</th>
-                <th scope="col" className="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-4 py-3 w-32">Hubs & Accelerators</th>
+              <tr className="border-b border-slate-200 bg-slate-50 dark:border-zinc-800 dark:bg-zinc-900/60">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Feature</th>
+                <th scope="col" className="w-28 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Free</th>
+                <th scope="col" className="w-28 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Founder</th>
+                <th scope="col" className="w-32 px-4 py-3 text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Pro Founder</th>
+                <th scope="col" className="w-32 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Hubs & Accelerators</th>
               </tr>
             </thead>
             <tbody>
@@ -234,22 +318,22 @@ export default function PricingPage() {
                 <tr
                   key={row.label}
                   className={cn(
-                    "border-b border-slate-100 dark:border-zinc-800/60 last:border-0",
+                    "border-b border-slate-100 last:border-0 dark:border-zinc-800/60",
                     i % 2 === 1 && "bg-slate-50/40 dark:bg-zinc-900/30",
                   )}
                 >
-                  <th scope="row" className="text-left font-medium text-slate-700 dark:text-zinc-300 px-4 py-3">{row.label}</th>
-                  <td className="text-center px-4 py-3"><Cell value={row.free} /></td>
-                  <td className="text-center px-4 py-3"><Cell value={row.founder} /></td>
-                  <td className="text-center px-4 py-3 bg-amber-50/40 dark:bg-amber-500/5"><Cell value={row.pro} /></td>
-                  <td className="text-center px-4 py-3"><Cell value={row.enterprise} /></td>
+                  <th scope="row" className="px-4 py-3 text-left font-medium text-slate-700 dark:text-zinc-300">{row.label}</th>
+                  <td className="px-4 py-3 text-center"><Cell value={row.free} /></td>
+                  <td className="px-4 py-3 text-center"><Cell value={row.founder} /></td>
+                  <td className="bg-indigo-50/40 px-4 py-3 text-center dark:bg-indigo-500/5"><Cell value={row.pro} /></td>
+                  <td className="px-4 py-3 text-center"><Cell value={row.enterprise} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        <p className="text-xs text-slate-400 dark:text-zinc-500 mt-4">
+        <p className="mt-4 text-xs text-slate-400 dark:text-zinc-500">
           New accounts get 30 days of full Pro access, so every row above reads as included while you trial.
           When it ends you keep the Free plan and every report you already generated stays readable — you
           just stop being able to start new sessions beyond two a week. Hubs & Accelerators is priced custom
@@ -258,21 +342,20 @@ export default function PricingPage() {
 
         {/* Roadmap — deliberately OUTSIDE the comparison table, so nothing here
             sits in a column next to a price. */}
-        <section className="mt-8 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 p-6 sm:p-7">
-          <div className="flex items-center gap-2 mb-2">
+        <section className="mt-8 rounded-2xl border border-dashed border-slate-300 p-6 dark:border-zinc-700 sm:p-7">
+          <div className="mb-2 flex items-center gap-2">
             <Hammer size={15} className="text-slate-400 dark:text-zinc-500" />
             <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
               In development — not included in any plan
             </h2>
           </div>
-          <p className="text-xs text-slate-500 dark:text-zinc-400 mb-5 max-w-2xl">
+          <p className="mb-5 max-w-2xl text-xs text-slate-500 dark:text-zinc-400">
             None of this is built yet, none of it is purchasable, and nothing on this page charges you for it.
-            It is here because a roadmap is more useful than a mystery.
           </p>
-          <ul className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
+          <ul className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
             {IN_DEVELOPMENT.map((f) => (
               <li key={f.label} className="flex items-start gap-2.5">
-                <Sparkles size={14} className="shrink-0 mt-0.5 text-slate-300 dark:text-zinc-600" />
+                <Sparkles size={14} className="mt-0.5 shrink-0 text-slate-300 dark:text-zinc-600" />
                 <div>
                   <p className="text-xs font-bold text-slate-700 dark:text-zinc-300">{f.label}</p>
                   <p className="text-xs text-slate-500 dark:text-zinc-400">{f.blurb}</p>
@@ -281,27 +364,11 @@ export default function PricingPage() {
             ))}
           </ul>
         </section>
-
-        <div className="mt-12 rounded-2xl gradient-brand p-8 text-center text-white relative overflow-hidden">
-          <div className="relative z-10 max-w-xl mx-auto">
-            <h2 className="font-display text-xl sm:text-2xl font-semibold mb-2">Still deciding?</h2>
-            <p className="text-sm text-white/75 mb-5">
-              Run two full pitch sessions this week on the free plan. No card required.
-            </p>
-            <Link
-              to={isLoggedIn ? "/setup" : "/signup"}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-white text-indigo-600 font-semibold rounded-xl hover:bg-white/95 transition-all shadow-lg text-sm"
-            >
-              {isLoggedIn ? "Start a pitch" : "Start free"} <ArrowRight size={16} />
-            </Link>
-          </div>
-          <div className="absolute -top-16 -right-16 w-52 h-52 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-        </div>
       </main>
 
-      <footer className="border-t border-slate-100 dark:border-zinc-800/60 mt-10">
-        <div className="max-w-295 mx-auto px-5 sm:px-7 py-6 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-slate-400 dark:text-zinc-500">
-          <span>© {new Date().getFullYear()} PitchNest</span>
+      <footer className="mt-10 border-t border-slate-100 dark:border-zinc-800/60">
+        <div className="mx-auto flex max-w-295 flex-col items-center justify-between gap-3 px-5 py-6 text-xs text-slate-400 dark:text-zinc-500 sm:flex-row sm:px-7">
+          <span>© {new Date().getFullYear()} PitchNest · Payments by Flutterwave</span>
           <div className="flex gap-4">
             <Link to="/privacy" className="hover:text-sky-600 dark:hover:text-sky-400">Privacy</Link>
             <Link to="/terms" className="hover:text-sky-600 dark:hover:text-sky-400">Terms</Link>

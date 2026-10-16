@@ -175,7 +175,7 @@ export default function PitchDecksManagement() {
           const data = await response.json();
           const formattedData = data.map((deck: any) => ({
             ...deck,
-            image: `https://api.dicebear.com/9.x/shapes/svg?seed=${deck.id}&backgroundColor=0ea5e9,4f46e5,0f172a`,
+            image: "/deck-placeholder.svg",
           }));
           setDecks(formattedData);
           setIsLoading(false);
@@ -191,23 +191,18 @@ export default function PitchDecksManagement() {
   }, []);
 
   // 🖼️ Preview a deck — resolve a short-lived signed URL (private bucket) then
-  // open it. Falls back to the raw stored file_url (legacy public URL only) if
-  // the signed fetch fails, so preview never breaks. Local-fallback /uploads
-  // paths are deliberately NOT used as a fallback (S7): they are no longer
-  // publicly served, and only the signed-url endpoint can produce a valid
-  // token-gated /api/files URL for them.
+  // open it. Raw database file references are never used as navigation targets;
+  // only the owner-checked signing endpoint may issue a preview capability.
   const onPreview = useCallback(
-    async (deckId: string | number, fileUrl?: string) => {
-      let target = fileUrl && !fileUrl.startsWith("/uploads/") ? fileUrl : "";
+    async (deckId: string | number, _fileUrl?: string) => {
+      let target = "";
       try {
         const res = await authFetch(`/api/decks/${deckId}/signed-url`);
         if (res.ok) {
           const data = await res.json().catch(() => null);
           if (data?.url) target = data.url;
         }
-      } catch (e) {
-        // fall through to fileUrl
-      }
+      } catch {}
       if (!target) return;
       window.open(target, "_blank", "noreferrer");
     },
@@ -225,7 +220,7 @@ export default function PitchDecksManagement() {
         name: file.name.replace(/\.[^/.]+$/, ""),
         created_at: new Date().toISOString(),
         status: "DRAFT",
-        image: `https://api.dicebear.com/9.x/shapes/svg?seed=${tempId}&backgroundColor=0ea5e9,4f46e5,0f172a`,
+        image: "/deck-placeholder.svg",
         size: parseFloat((file.size / (1024 * 1024)).toFixed(2)),
         file: file,
       };
@@ -251,7 +246,7 @@ export default function PitchDecksManagement() {
             d.id === tempDeck.id
               ? {
                   ...savedDeck,
-                  image: `https://api.dicebear.com/9.x/shapes/svg?seed=${savedDeck.id}&backgroundColor=0ea5e9,4f46e5,0f172a`,
+                  image: "/deck-placeholder.svg",
                 }
               : d,
           ),

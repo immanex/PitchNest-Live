@@ -9,7 +9,6 @@ import {
   Settings,
   Bell,
   Search,
-  LogOut,
   Menu,
   X,
   Download,
@@ -31,15 +30,18 @@ import {
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { cn } from '../lib/utils';
-import { isPaidPlan } from '../lib/entitlements';
+import { hasPaidPlan } from '../lib/billing';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '../contexts/AuthContext';
+import { useBilling } from '../contexts/BillingContext';
 import { LogoLink, LogoMark } from './Logo';
 import { InstallPrompt } from './InstallPrompt';
-import { NOTIFICATIONS_TAB_PATH, PROFILE_PATH, SUBSCRIPTION_TAB_PATH } from '../lib/routes';
+import { AccountMenu } from './layout/AccountMenu';
+import { NOTIFICATIONS_TAB_PATH, PRICING_PATH, SUBSCRIPTION_TAB_PATH } from '../lib/routes';
 import { useNotifications } from '../hooks/useNotifications';
 import { useEcosystemFeatures } from '../hooks/useEcosystemFeatures';
 import type { AppNotification } from '../api/notifications';
+import { getStoredUser } from '../lib/authStorage';
 
 /**
  * The one frame every app page sits in, signed in or not: grouped sidebar,
@@ -151,9 +153,11 @@ export default function AppLayout() {
   // notifications and plans belong to user accounts.
   const founder = user && user.accountType !== 'organization' ? user : null;
   const signedIn = Boolean(founder);
-  // From context, not the localStorage copy below — a cached user object would
-  // keep showing the upsell to someone who just upgraded.
-  const isPaid = isPaidPlan(founder?.plan);
+  // From the billing context, not the localStorage copy below — a cached user
+  // object would keep showing the upsell to someone who just upgraded. The trial
+  // reports plan "pro" too, so paid means a plan that is not the trial.
+  const { info: billing, loaded: billingLoaded } = useBilling();
+  const isPaid = hasPaidPlan(billing);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -188,7 +192,7 @@ export default function AppLayout() {
   const [userData, setUserData] = useState<{ name: string; email?: string; bio?: string; avatarUrl?: string; role?: string }>({ name: 'Founder' });
 
   const loadUserData = () => {
-    const storedUser = localStorage.getItem('user');
+    const storedUser = getStoredUser();
     if (storedUser) {
       try { setUserData(JSON.parse(storedUser)); } catch (e) {}
     }
@@ -439,54 +443,15 @@ export default function AppLayout() {
           </div>
         )}
 
-        {/* Upsell — free users only. Showing an "upgrade" card to someone who
-            already pays reads as a billing error. */}
-        {signedIn && !isPaid && (
-          <div className="group relative mt-3 shrink-0 overflow-hidden rounded-xl p-3 text-white gradient-brand">
-            <div className="relative z-10">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-accent">Free plan</span>
-              <p className="mt-0.5 text-[11px] font-medium text-white">2 pitches a week, 10 min each</p>
-              <Link to={SUBSCRIPTION_TAB_PATH} onClick={closeMenu} className="mt-2.5 block w-full rounded-lg bg-white py-1.5 text-center text-xs font-semibold text-indigo-600 transition-colors hover:bg-white/95">
-                Upgrade to Pro
-              </Link>
-            </div>
-            <div className="absolute -bottom-4 -right-4 h-24 w-24 rounded-full bg-white/10 blur-2xl transition-transform group-hover:scale-110" />
-          </div>
-        )}
-
         {signedIn && (
-          <div className="mt-3 flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 p-1.5 dark:border-zinc-800 dark:bg-zinc-800/50">
-            <Link
-              to={PROFILE_PATH}
-              onClick={closeMenu}
-              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-0.5 transition-colors hover:bg-white dark:hover:bg-zinc-800"
-              aria-label="View your profile"
-            >
-              <img
-                src={userData.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.name}`}
-                alt=""
-                className="h-8 w-8 shrink-0 rounded-full border-2 border-white bg-sky-100 object-cover shadow-sm dark:border-zinc-700"
-                referrerPolicy="no-referrer"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-bold text-slate-900 dark:text-zinc-100">{userData.name}</p>
-                <p className="truncate text-[10px] font-medium text-slate-400 dark:text-zinc-500">{userData.role || 'Founder'}</p>
-              </div>
-            </Link>
-            <Link
-              to="/settings"
-              onClick={closeMenu}
-              className={cn(
-                'shrink-0 rounded-lg p-1.5 transition-colors',
-                location.pathname === '/settings' ? 'text-indigo-600 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-700 dark:text-zinc-500 dark:hover:text-zinc-200',
-              )}
-              aria-label="Settings"
-            >
-              <Settings size={16} />
-            </Link>
-            <button type="button" onClick={handleLogout} className="shrink-0 cursor-pointer p-1.5 text-slate-400 transition-colors hover:text-rose-500 dark:text-zinc-500" aria-label="Log out">
-              <LogOut size={16} />
-            </button>
+          <div className="-mx-1 border-t border-slate-200/80 px-1 dark:border-zinc-800/80">
+            <AccountMenu
+              name={userData.name || founder?.name || 'Founder'}
+              email={userData.email || founder?.email}
+              avatarUrl={userData.avatarUrl || founder?.avatarUrl}
+              onNavigate={closeMenu}
+              onLogout={handleLogout}
+            />
           </div>
         )}
       </aside>
@@ -526,9 +491,9 @@ export default function AppLayout() {
               <div className="hidden md:block"><ThemeToggle /></div>
               {notificationBell}
 
-              {signedIn && (
+              {signedIn && billingLoaded && (
                 <Link
-                  to={SUBSCRIPTION_TAB_PATH}
+                  to={isPaid ? SUBSCRIPTION_TAB_PATH : PRICING_PATH}
                   className={cn(
                     'hidden items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-colors xl:inline-flex',
                     isPaid
@@ -537,7 +502,7 @@ export default function AppLayout() {
                   )}
                 >
                   {isPaid ? <ShieldCheck size={14} /> : <Sparkles size={14} />}
-                  {isPaid ? 'View Plan' : 'Upgrade'}
+                  {isPaid ? 'View plan' : 'Upgrade'}
                 </Link>
               )}
 

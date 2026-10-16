@@ -10,6 +10,12 @@ import {
 } from "lucide-react";
 import { LogoLink } from "../components/Logo";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  getAuthToken,
+  getStoredUser,
+  storeAuthSession,
+  updateStoredUser,
+} from "../lib/authStorage";
 
 // MUST match the backend's EMAIL_FROM / config.emailFrom (backend/src/config/env.ts).
 // This previously read "pitchnestapp@gmail.com" — an address that has never sent
@@ -151,9 +157,8 @@ export default function VerifyEmailPage() {
           // The emailed-link path proves ownership via the high-entropy token,
           // so the server returns a session token on both "verified" and
           // "already verified" — store it and route via the server's redirectTo.
-          localStorage.setItem("user", JSON.stringify(data.user));
-          localStorage.setItem("token", data.token);
-          navigate(data.redirectTo || "/onboarding", { replace: true });
+          storeAuthSession(data.user, data.token, false);
+          window.location.replace(data.redirectTo || "/onboarding");
         } else if (data.alreadyVerified) {
           navigate("/login", { replace: true });
         } else {
@@ -194,9 +199,8 @@ export default function VerifyEmailPage() {
       .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
       .then(({ ok, data }) => {
         if (ok && data.message === "Email verified successfully" && data.token) {
-          localStorage.setItem("user", JSON.stringify(data.user));
-          localStorage.setItem("token", data.token);
-          navigate(data.redirectTo || "/onboarding", { replace: true });
+          storeAuthSession(data.user, data.token, false);
+          window.location.replace(data.redirectTo || "/onboarding");
         } else if (ok && data.alreadyVerified) {
           // Account is already verified (e.g. verified on another device). No
           // token is issued without a matching code — send them to log in.
@@ -223,7 +227,7 @@ export default function VerifyEmailPage() {
 
   // 2. Poll for cross-device verification status
   useEffect(() => {
-    const storedToken = localStorage.getItem("token");
+    const storedToken = getAuthToken();
     if (!storedToken || status === "verifying") return;
 
     const interval = setInterval(() => {
@@ -237,12 +241,12 @@ export default function VerifyEmailPage() {
         .then((data) => {
           if (data.isEmailVerified) {
             clearInterval(interval);
-            const storedUser = localStorage.getItem("user");
+            const storedUser = getStoredUser();
             if (storedUser) {
               try {
                 const userObj = JSON.parse(storedUser);
                 userObj.isEmailVerified = true;
-                localStorage.setItem("user", JSON.stringify(userObj));
+                updateStoredUser(userObj);
               } catch (e) {}
             }
             if (data.onboardingCompleted) {

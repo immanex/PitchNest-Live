@@ -42,7 +42,9 @@ import {
 } from "lucide-react";
 import { LogoMark } from "../../../components/Logo";
 import { ThemeToggle } from "../../../components/ThemeToggle";
+import { UserAvatar } from "../../../components/ui/UserAvatar";
 import { useAuth } from "../../../contexts/AuthContext";
+import QRCode from "qrcode";
 
 /* ------------------------------------------------------------------ */
 /*  API DATA CONTRACT                                                  */
@@ -415,35 +417,11 @@ const MemberStatusPill: React.FC<{ status: MemberStatus }> = ({ status }) => {
   );
 };
 
-const initials = (name: string) =>
-  name
-    .split(" ")
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
 const Avatar: React.FC<{
   name: string;
   url?: string | null;
   size?: number;
-}> = ({ name, url, size = 36 }) =>
-  url ? (
-    <img
-      src={url}
-      alt={name}
-      className="rounded-full object-cover shrink-0"
-      style={{ width: size, height: size }}
-    />
-  ) : (
-    <div
-      className="rounded-full shrink-0 flex items-center justify-center text-white text-xs font-semibold bg-gradient-to-br from-indigo-600 to-sky-600 shadow-xs"
-      style={{ width: size, height: size }}
-    >
-      {initials(name)}
-    </div>
-  );
+}> = ({ name, url, size = 36 }) => <UserAvatar name={name} avatarUrl={url} size={size} />;
 
 const formatDate = (iso: string | null) =>
   iso
@@ -986,12 +964,26 @@ const OrganizationTab: React.FC<{
   onBack: () => void;
 }> = ({ org, onBack }) => {
   const [copied, setCopied] = useState(false);
+  const [qrSrc, setQrSrc] = useState("");
 
-  // Public, no-key QR generator. Swap for a bundled lib (e.g. qrcode.react)
-  // if you'd rather not depend on an external service.
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(
-    org.enrollLink,
-  )}`;
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(org.enrollLink, {
+      width: 240,
+      margin: 1,
+      errorCorrectionLevel: "M",
+      color: { dark: "#0f172a", light: "#ffffff" },
+    })
+      .then((value) => {
+        if (!cancelled) setQrSrc(value);
+      })
+      .catch(() => {
+        if (!cancelled) setQrSrc("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [org.enrollLink]);
 
   const copyLink = async () => {
     try {
@@ -1128,13 +1120,19 @@ const OrganizationTab: React.FC<{
             Scan to open
           </p>
           <div className="p-3 rounded-2xl bg-white">
-            <img
-              src={qrSrc}
-              alt="QR code for organization link"
-              width={200}
-              height={200}
-              className="rounded-lg block"
-            />
+            {qrSrc ? (
+              <img
+                src={qrSrc}
+                alt="QR code for organization link"
+                width={200}
+                height={200}
+                className="rounded-lg block"
+              />
+            ) : (
+              <div className="flex h-[200px] w-[200px] items-center justify-center rounded-lg bg-slate-50 px-5 text-xs text-slate-500">
+                QR preview unavailable. Copy the invitation link below.
+              </div>
+            )}
           </div>
           <div className="w-full mt-5 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
             <span className="flex-1 text-xs text-slate-600 dark:text-slate-300 truncate text-left">

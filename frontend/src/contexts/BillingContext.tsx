@@ -31,11 +31,32 @@ export interface CatalogItem {
   days: number;
 }
 
+/** The auto-renewing subscription behind a paid plan. */
+export interface SubscriptionInfo {
+  plan: PaidPlan;
+  term: BillingTerm;
+  amount: number;
+  currency: string;
+  /** True while Flutterwave will keep charging. */
+  autoRenew: boolean;
+  nextChargeAt: string | null;
+  cancelledAt: string | null;
+}
+
+/** Free months added to a first subscription, and whether this user gets them. */
+export interface OfferInfo {
+  freeMonths: number;
+  eligible: boolean;
+}
+
 interface BillingInfo {
   /** What the server says we have right now. */
   plan: "free" | "prep" | "pro";
   /** ISO timestamp when the paid period ends, or null if it never expires. */
   expiresAt: string | null;
+  /** The free signup trial (full Pro access, no card). */
+  isTrial: boolean;
+  trialDaysRemaining: number;
   /** Whether a real checkout is even possible (FLW keys configured). */
   billingEnabled: boolean;
   /** Headline price (Pro monthly), for single-number surfaces. */
@@ -46,15 +67,30 @@ interface BillingInfo {
   } | null;
   /** Every purchasable SKU (plan × term), for the pricing selector. */
   catalog: CatalogItem[];
+  /** The active subscription, else the most recent one; null if none ever. */
+  subscription: SubscriptionInfo | null;
+  offer: OfferInfo;
 }
 
 const DEFAULT_INFO: BillingInfo = {
   plan: "free",
   expiresAt: null,
+  isTrial: false,
+  trialDaysRemaining: 0,
   billingEnabled: false,
   price: null,
   catalog: [],
+  subscription: null,
+  offer: { freeMonths: 0, eligible: false },
 };
+
+function readOffer(raw: any): OfferInfo {
+  const freeMonths = Number(raw?.freeMonths);
+  return {
+    freeMonths: Number.isInteger(freeMonths) && freeMonths > 0 ? freeMonths : 0,
+    eligible: raw?.eligible === true,
+  };
+}
 
 interface BillingContextValue {
   info: BillingInfo;
@@ -66,6 +102,8 @@ interface BillingContextValue {
    * user why. When true the caller should expect a redirect.
    */
   upgrade: (selection?: { plan?: PaidPlan; term?: BillingTerm }) => Promise<boolean>;
+  /** Turns off auto-renew. Paid time already bought is kept. */
+  cancelSubscription: () => Promise<{ ok: boolean; message?: string }>;
   refresh: () => Promise<void>;
 }
 
@@ -73,6 +111,7 @@ const BillingContext = createContext<BillingContextValue>({
   info: DEFAULT_INFO,
   loaded: false,
   upgrade: async () => false,
+  cancelSubscription: async () => ({ ok: false }),
   refresh: async () => {},
 });
 
@@ -97,9 +136,13 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setInfo({
         plan: body.plan ?? "free",
         expiresAt: body.expiresAt ?? null,
+        isTrial: body.isTrial === true,
+        trialDaysRemaining: Number(body.trialDaysRemaining) || 0,
         billingEnabled: !!body.billingEnabled,
         price: body.price ?? null,
         catalog: Array.isArray(body.catalog) ? body.catalog : [],
+        subscription: body.subscription && typeof body.subscription === "object" ? body.subscription : null,
+        offer: readOffer(body.offer),
       });
     } catch (err) {
       console.warn("billing/plan threw:", err);
@@ -149,15 +192,28 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           return false;
         }
 
-        if (!body?.paymentLink) {
-          console.error("checkout returned no paymentLink:", body);
+        let paymentUrl: URL;
+        try {
+          paymentUrl = new URL(String(body?.paymentLink || ""));
+        } catch {
+          console.error("checkout returned an invalid paymentLink");
+          window.alert("Couldn't start checkout. Please try again in a moment.");
+          return false;
+        }
+        if (
+          paymentUrl.protocol !== "https:" ||
+          paymentUrl.hostname !== "checkout.flutterwave.com" ||
+          paymentUrl.username ||
+          paymentUrl.password
+        ) {
+          console.error("checkout returned an untrusted paymentLink origin");
           window.alert("Couldn't start checkout. Please try again in a moment.");
           return false;
         }
 
         // Deliberately NO optimistic upgrade: nothing is paid yet. Pro/Prep is
         // granted only by the verified webhook, which the return page picks up.
-        window.location.href = body.paymentLink;
+        window.location.assign(paymentUrl.toString());
         return true;
       } catch (err) {
         console.error("upgrade threw:", err);
@@ -168,9 +224,21 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [authFetch],
   );
 
+  const cancelSubscription = useCallback(async () => {
+    try {
+      const res = await authFetch("/api/billing/subscription/cancel", { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, message: body?.error || "Couldn't cancel right now. Please try again." };
+      await refresh();
+      return { ok: true };
+    } catch {
+      return { ok: false, message: "Couldn't cancel right now. Please try again." };
+    }
+  }, [authFetch, refresh]);
+
   const value = useMemo(
-    () => ({ info, loaded, upgrade, refresh }),
-    [info, loaded, upgrade, refresh],
+    () => ({ info, loaded, upgrade, cancelSubscription, refresh }),
+    [info, loaded, upgrade, cancelSubscription, refresh],
   );
 
   return <BillingContext.Provider value={value}>{children}</BillingContext.Provider>;

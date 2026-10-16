@@ -3,6 +3,9 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { CheckCircle2, Loader2, AlertTriangle, ArrowRight } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useBilling } from "../contexts/BillingContext";
+import { getAuthToken } from "../lib/authStorage";
+import { planName } from "../lib/billing";
+import { PRICING_PATH, SUBSCRIPTION_TAB_PATH } from "../lib/routes";
 
 /**
  * Where Flutterwave sends the user after the hosted checkout.
@@ -35,6 +38,7 @@ export default function BillingReturn() {
   const [outcome, setOutcome] = useState<Outcome>(
     claimedStatus === "cancelled" ? "failed" : "checking",
   );
+  const [planLabel, setPlanLabel] = useState("your new plan");
   const pollsRef = useRef(0);
 
   useEffect(() => {
@@ -49,7 +53,7 @@ export default function BillingReturn() {
 
         // Read the authoritative answer straight from the API rather than
         // waiting for context state to settle.
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const res = await fetch("/api/billing/plan", {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
@@ -57,7 +61,11 @@ export default function BillingReturn() {
 
         if (cancelled) return;
 
-        if (body?.plan === "pro") {
+        // A paid plan with a live subscription. Plan alone is not enough: the
+        // free trial also reports "pro".
+        const paidPlan = body?.plan === "pro" || body?.plan === "prep";
+        if (paidPlan && body?.expiresAt && body?.subscription?.autoRenew) {
+          setPlanLabel(planName(body.plan));
           setOutcome("success");
           return;
         }
@@ -100,11 +108,11 @@ export default function BillingReturn() {
               <CheckCircle2 className="text-emerald-500" size={30} strokeWidth={1.8} />
             </div>
             <h1 className="mb-2 text-xl font-bold text-slate-900 dark:text-zinc-100">
-              You're on Pro
+              You're on {planLabel}
             </h1>
             <p className="mb-6 text-sm leading-relaxed text-slate-500 dark:text-zinc-400">
-              Unlimited sessions, longer pitch durations, live market research in your
-              panel, and the full downloadable report.
+              Your plan renews automatically. You can see it or cancel any time in
+              Settings, under Billing.
             </p>
             <button
               type="button"
@@ -125,12 +133,12 @@ export default function BillingReturn() {
               Payment is still processing
             </h1>
             <p className="mb-6 text-sm leading-relaxed text-slate-500 dark:text-zinc-400">
-              Your bank hasn't confirmed yet. If money left your account, Pro will
-              activate automatically — you don't need to pay again. Check Settings in
-              a few minutes, and contact us if it hasn't appeared.
+              Your bank hasn't confirmed yet. If money left your account, your plan
+              will activate automatically — you don't need to pay again. Check Billing
+              in a few minutes, and contact us if it hasn't appeared.
             </p>
             <Link
-              to="/settings"
+              to={SUBSCRIPTION_TAB_PATH}
               className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               Go to Settings
@@ -151,7 +159,7 @@ export default function BillingReturn() {
               week, 10 minutes each.
             </p>
             <Link
-              to="/settings"
+              to={PRICING_PATH}
               className="inline-flex w-full items-center justify-center rounded-xl bg-sky-500 py-3 text-sm font-bold text-white transition-colors hover:bg-sky-600"
             >
               Try again

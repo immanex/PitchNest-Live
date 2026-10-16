@@ -44,6 +44,8 @@ import { Sparkles, Rocket, Crown, Building2 } from "lucide-react";
 export interface Plan {
   id: "free" | "founder" | "pro" | "enterprise";
   name: string;
+  /** The big line on a pricing card. */
+  headline: string;
   tagline: string;
   price: string;
   features: string[];
@@ -83,7 +85,7 @@ export const IN_DEVELOPMENT: { label: string; blurb: string }[] = [
     blurb: "Warm introductions to funds matched to your stage and sector.",
   },
   {
-    label: "Video replay",
+    label: "Session audio replay",
     blurb: "Rewatch the session with the transcript and reactions in sync.",
   },
   {
@@ -96,6 +98,7 @@ const base: Omit<Plan, "price">[] = [
   {
     id: "free",
     name: "Free",
+    headline: "Try the panel",
     tagline: "Try the panel — no card required.",
     features: [
       "All 10 AI investor personas",
@@ -112,6 +115,7 @@ const base: Omit<Plan, "price">[] = [
   {
     id: "founder",
     name: "Founder",
+    headline: "Practise without limits",
     tagline: "Where founders get serious.",
     features: [
       "Everything in Free",
@@ -121,12 +125,13 @@ const base: Omit<Plan, "price">[] = [
     ],
     featured: false,
     available: true,
-    cta: { label: "Choose Founder", href: "/settings?tab=subscription" },
+    cta: { label: "Choose Founder", href: "/pricing" },
     icon: Rocket,
   },
   {
     id: "pro",
     name: "Pro Founder",
+    headline: "Prepare for the raise",
     tagline: "Deep prep for active fundraising.",
     features: [
       "Everything in Founder",
@@ -136,12 +141,13 @@ const base: Omit<Plan, "price">[] = [
     ],
     featured: true,
     available: true,
-    cta: { label: "Upgrade to Pro Founder", href: "/settings?tab=subscription" },
+    cta: { label: "Upgrade to Pro Founder", href: "/pricing" },
     icon: Crown,
   },
   {
     id: "enterprise",
     name: "Hubs & Accelerators",
+    headline: "Run a cohort",
     tagline: "One relationship, many founders.",
     features: [
       "Everything in Pro",

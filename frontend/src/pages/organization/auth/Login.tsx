@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { cn } from "../../../lib/utils";
 import { useAuth } from "../../../contexts/AuthContext";
+import { clearAuthSession } from "../../../lib/authStorage";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -26,19 +27,19 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 const SLIDES = [
   {
     image:
-      "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=800&q=80",
+      "/assets/heroImage.jpeg",
     title: "The AI Pitch Deck Evolution",
     desc: "Join 500+ founders using PitchNest to refine their narratives with real-time AI feedback.",
   },
   {
     image:
-      "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&w=800&q=80",
+      "/assets/heroImage.jpeg",
     title: "Nail Your Delivery",
     desc: "Practice with multimodal AI investors that simulate high-pressure venture capital environments.",
   },
   {
     image:
-      "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80",
+      "/assets/heroImage.jpeg",
     title: "Actionable Insights",
     desc: "Get deep analytics on your pacing, clarity, and scalability after every single session.",
   },
@@ -194,8 +195,7 @@ export default function LoginPage() {
     try {
       // Clear only auth-related keys — preserve tour flags (pn_tour_*) so
       // returning users don't get re-shown the walkthrough on every login.
-      localStorage.removeItem("user");
-      localStorage.removeItem("token");
+      clearAuthSession();
       localStorage.removeItem("pitchnest_onboarding_complete");
       localStorage.removeItem("pitchnest_startup_name");
       localStorage.removeItem("pitchnest_funding_stage");

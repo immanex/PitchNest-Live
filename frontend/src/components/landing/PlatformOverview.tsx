@@ -140,7 +140,7 @@ export function PlatformOverview({ isLoggedIn }: { isLoggedIn: boolean }) {
         <SectionReveal className="mt-6">
           <p className="text-xs text-slate-400 dark:text-zinc-500 text-center">
             <Lock size={13} className="inline-block -mt-0.5 mr-1.5 align-middle" aria-hidden="true" />
-            Decks, recordings, transcripts and reports stay private. Nothing goes public until you preview it and confirm.
+            Nothing goes public until you preview it and confirm. Invited organization members separately share scores and feedback with that organization.
           </p>
         </SectionReveal>
       </div>

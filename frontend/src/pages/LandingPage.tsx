@@ -16,6 +16,7 @@ import { HeroVisual, LivePanelPreview, ReportPreview } from '../components/landi
 import { LogoLink, LogoMark } from '../components/Logo';
 import { getPlans } from '../lib/plans';
 import { usePublicPrice } from '../hooks/usePublicPrice';
+import { getAuthToken } from '../lib/authStorage';
 
 /** Rooms founders rehearse for, scrolling under the hero. */
 const ROOMS = [
@@ -89,7 +90,7 @@ export default function LandingPage() {
   const publicPrice = usePublicPrice();
   const plans = useMemo(() => getPlans(publicPrice), [publicPrice]);
 
-  useEffect(() => { if (localStorage.getItem('user')) setIsLoggedIn(true); }, []);
+  useEffect(() => { if (getAuthToken()) setIsLoggedIn(true); }, []);
 
   // Pre-warm the Render backend so login/signup don't hit a cold start
   useEffect(() => { fetch('/api/health').catch(() => {}); }, []);

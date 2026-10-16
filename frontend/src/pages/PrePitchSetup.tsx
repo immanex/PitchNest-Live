@@ -163,7 +163,7 @@ export default function PrePitchSetup() {
       setAvailableDecks(prev => 
         prev.map(d => d.id === tempId ? {
           ...savedDeck,
-          image: `https://api.dicebear.com/9.x/shapes/svg?seed=${savedDeck.id}&backgroundColor=0ea5e9,4f46e5,0f172a`
+          image: "/deck-placeholder.svg"
         } : d)
       );
       setSelectedDeck(savedDeck);
