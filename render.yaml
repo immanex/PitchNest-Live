@@ -49,6 +49,10 @@ services:
         sync: false
       - key: AI_ADVANCED_REASONING_EFFORT
         sync: false
+      # Reasoning for live panel replies, verdicts and tips when the model has
+      # no effort of its own. Empty means "none" (fastest first word).
+      - key: AI_LIVE_REASONING_EFFORT
+        sync: false
       - key: AZURE_SPEECH_KEY
         sync: false
       - key: AZURE_SPEECH_REGION
