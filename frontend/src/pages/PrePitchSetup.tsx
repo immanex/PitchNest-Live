@@ -582,8 +582,13 @@ export default function PrePitchSetup() {
           </div>
 
           <div className="bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-3xl border border-slate-200 dark:border-zinc-800 shadow-sm shrink-0">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1.5 col-span-1">
+            {/* Two columns, each select stacked full-width inside its column:
+                the old three columns of side-by-side selects squeezed each one
+                to a few characters ("SaaS &", "Pre-S", "10 mi"). At lg the
+                sidebar and preview panel narrow this card, so it drops to one
+                column until xl. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="space-y-1.5 col-span-1 sm:col-span-2 lg:col-span-1 xl:col-span-2">
                 <div className="flex justify-between">
                   <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5"><Briefcase size={14} className="text-sky-500"/> Startup Name</label>
                   {errors.businessName && <span className="text-[10px] text-rose-500 font-bold">{errors.businessName.message}</span>}
@@ -592,13 +597,13 @@ export default function PrePitchSetup() {
               </div>
               <div className="space-y-1.5 col-span-1">
                 <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5"><AlignLeft size={14} className="text-sky-500"/> Industry & Persona</label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <select {...register('industry')} className="w-full sm:flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
+                <div className="flex flex-col gap-2">
+                  <select {...register('industry')} className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
                     {withCurrent(INDUSTRY_OPTIONS, industryValue).map((option) => (
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
-                  <select {...register('investorArchetype')} className="w-full sm:flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
+                  <select {...register('investorArchetype')} className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
                     <option value="Seed Stage - Venture Capital">Seed VC</option>
                     <option value="Angel Investor Group">Angel Group</option>
                     <option value="Growth Stage - Venture Capital">Growth Fund</option>
@@ -614,8 +619,8 @@ export default function PrePitchSetup() {
               </div>
               <div className="space-y-1.5 col-span-1">
                 <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5"><Clock size={14} className="text-sky-500"/> Funding & Duration</label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <select {...register('fundingStage')} className="w-full sm:flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
+                <div className="flex flex-col gap-2">
+                  <select {...register('fundingStage')} className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
                     {withCurrent(STAGE_OPTIONS, fundingStageValue).map((option) => (
                       <option key={option} value={option}>{option}</option>
                     ))}
@@ -641,7 +646,7 @@ export default function PrePitchSetup() {
                       }
                       setValue('duration', mins, { shouldValidate: true });
                     }}
-                    className="w-full sm:flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-zinc-800 border rounded-xl dark:border-zinc-700 text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                   >
                     {DURATION_OPTIONS.map((mins) => {
                       const locked = !allowedDurations.includes(mins);
@@ -654,7 +659,7 @@ export default function PrePitchSetup() {
                   </select>
                 </div>
               </div>
-              <div className="space-y-1.5 col-span-1 md:col-span-3">
+              <div className="space-y-1.5 col-span-1 sm:col-span-2 lg:col-span-1 xl:col-span-2">
                 <div className="flex justify-between">
                   <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">Elevator Pitch</label>
                   {errors.description && <span className="text-[10px] text-rose-500 font-bold">{errors.description.message}</span>}

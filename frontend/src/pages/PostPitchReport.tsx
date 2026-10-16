@@ -236,8 +236,8 @@ export default function PostPitchReport() {
 
   return (
     <div className="max-w-7xl mx-auto pb-20 font-sans text-slate-900 dark:text-zinc-100">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-8 gap-4">
+        <div className="min-w-0">
           <div className="flex items-center gap-2 text-sky-500 font-bold text-[10px] uppercase tracking-widest mb-2">
             <Activity size={14} /> Post-Pitch Report
           </div>
@@ -254,11 +254,13 @@ export default function PostPitchReport() {
             </span>
           </div>
         </div>
-        <div className="flex flex-col md:flex-row md:flex-wrap md:justify-end gap-3 w-full md:w-auto">
+        {/* One straight row from sm up: below xl it sits under the title at
+            full width; at xl it moves beside the title. Never wraps. */}
+        <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto shrink-0">
           <button
             onClick={handleDownloadPDF}
             disabled={isDownloading}
-            className="w-full md:w-auto md:flex-none justify-center px-4 md:px-6 py-2.5 bg-sky-500 text-white font-bold rounded-xl hover:bg-sky-600 transition-all flex items-center gap-2 text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto sm:flex-auto xl:flex-none justify-center whitespace-nowrap px-4 md:px-6 py-2.5 bg-sky-500 text-white font-bold rounded-xl hover:bg-sky-600 transition-all flex items-center gap-2 text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {canPdf
               ? <>{isDownloading ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />} {isDownloading ? "Generating..." : "Download Detailed Report"}</>
@@ -266,11 +268,11 @@ export default function PostPitchReport() {
           </button>
           <button
             onClick={() => navigate('/setup', { state: { repitch: buildRepitchState(session) } })}
-            className="w-full md:w-auto md:flex-none justify-center px-4 md:px-6 py-2.5 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-zinc-700 transition-all flex items-center gap-2 text-sm shadow-sm"
+            className="w-full sm:w-auto sm:flex-auto xl:flex-none justify-center whitespace-nowrap px-4 md:px-6 py-2.5 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-zinc-700 transition-all flex items-center gap-2 text-sm shadow-sm"
           >
             <RotateCcw size={16} /> Pitch Again
           </button>
-          <Link to="/setup" className="w-full md:w-auto md:flex-none justify-center px-4 md:px-6 py-2.5 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 text-sm shadow-sm">
+          <Link to="/setup" className="w-full sm:w-auto sm:flex-auto xl:flex-none justify-center whitespace-nowrap px-4 md:px-6 py-2.5 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 text-sm shadow-sm">
             <Calendar size={16} /> Start New Session
           </Link>
         </div>

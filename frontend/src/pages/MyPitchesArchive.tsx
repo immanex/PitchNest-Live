@@ -116,16 +116,20 @@ const PitchRow = ({
       </Link>
 
       {/* Main content */}
-      <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+      {/* Columns only side by side at xl — below that the name column gets too
+          narrow for the badges and they spill over the date. */}
+      <div className="flex-1 min-w-0 flex flex-col xl:flex-row xl:items-center gap-2 xl:gap-6">
         {/* Name + type */}
-        <div className="min-w-0 sm:flex-1">
+        <div className="min-w-0 xl:flex-1">
           <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100 truncate">
             {name}
           </h3>
-          <span className="inline-flex items-center gap-1.5 mt-0.5">
+          {/* Each badge stays on one line; when space runs out a whole badge
+              wraps to the next row instead of its text breaking inside it. */}
+          <span className="flex flex-wrap items-center gap-1.5 mt-0.5">
             <span
               className={cn(
-                "inline-block px-2 py-0.5 border rounded-full text-[10px] font-bold uppercase tracking-widest",
+                "inline-block whitespace-nowrap px-2 py-0.5 border rounded-full text-[10px] font-bold uppercase tracking-widest",
                 MODE_BADGE_CLASSES[mode],
               )}
             >
@@ -138,7 +142,7 @@ const PitchRow = ({
             */}
             <span
               className={cn(
-                "inline-block px-2 py-0.5 border rounded-full text-[10px] font-bold uppercase tracking-widest tabular-nums",
+                "inline-block whitespace-nowrap px-2 py-0.5 border rounded-full text-[10px] font-bold uppercase tracking-widest tabular-nums",
                 attemptsExhausted
                   ? "bg-rose-500/10 text-rose-600 border-rose-500/25 dark:text-rose-400 dark:border-rose-500/30"
                   : "bg-slate-500/10 text-slate-500 border-slate-500/20 dark:text-zinc-400",
@@ -152,7 +156,7 @@ const PitchRow = ({
               is the standing answer to "which of these are public?".
             */}
             {shareEnabled && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-sky-500/20 rounded-full text-[10px] font-bold uppercase tracking-widest bg-sky-500/10 text-sky-600 dark:text-sky-400">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 border border-sky-500/20 rounded-full text-[10px] font-bold uppercase tracking-widest bg-sky-500/10 text-sky-600 dark:text-sky-400">
                 <Globe size={10} /> Link shared
               </span>
             )}
@@ -160,7 +164,7 @@ const PitchRow = ({
         </div>
 
         {/* Date + duration row on mobile, separate cols on desktop */}
-        <div className="flex items-center gap-4 sm:gap-6">
+        <div className="flex items-center gap-4 xl:gap-6">
           <div className="flex items-center gap-1.5">
             <Calendar
               size={13}
@@ -182,7 +186,7 @@ const PitchRow = ({
         </div>
 
         {/* Score bar */}
-        <div className="flex items-center gap-2 sm:w-28">
+        <div className="flex items-center gap-2 xl:w-28">
           <div className="flex-1 h-1.5 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden">
             <div
               className={cn(
