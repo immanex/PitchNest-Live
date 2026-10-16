@@ -31,7 +31,6 @@ build/
 */build/
 audit_build/
 coverage/
-.vercel/
 
 # Runtime & Uploads
 backend/uploads/

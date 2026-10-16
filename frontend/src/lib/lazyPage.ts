@@ -7,8 +7,8 @@ const RELOAD_COOLDOWN_MS = 60_000;
  * React.lazy for route pages, with one safety net.
  *
  * Every deploy renames the page files (content hashes). A tab opened before
- * the deploy still asks for the OLD names; on Vercel those requests fall
- * through the SPA rewrite and come back as index.html, so the import fails and
+ * the deploy still asks for the OLD names; the host's SPA fallback answers
+ * those requests with index.html, so the import fails and
  * the page would go blank. On that failure we reload once to pick up the new
  * build. The cooldown in sessionStorage guarantees this can never loop: a
  * second failure inside a minute is re-thrown to the nearest ErrorBoundary.

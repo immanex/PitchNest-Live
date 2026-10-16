@@ -20,7 +20,7 @@ const VENDOR_GROUPS: Array<[chunk: string, matches: (pkg: string) => boolean]> =
   ['vendor-charts', (p) => p === 'recharts' || p === 'victory-vendor' || p.startsWith('d3-') || ['internmap', 'decimal.js-light', '@reduxjs/toolkit', 'redux', 'redux-thunk', 'reselect', 'react-redux', 'immer', 'es-toolkit', 'eventemitter3'].includes(p)],
   ['vendor-motion', (p) => ['motion', 'framer-motion', 'motion-dom', 'motion-utils', 'lenis'].includes(p)],
   ['vendor-forms', (p) => ['zod', 'react-hook-form', '@hookform/resolvers'].includes(p)],
-  ['vendor-utils', (p) => ['tslib', 'clsx', 'tailwind-merge', 'js-cookie', 'tiny-invariant', '@vercel/analytics'].includes(p)],
+  ['vendor-utils', (p) => ['tslib', 'clsx', 'tailwind-merge', 'js-cookie', 'tiny-invariant'].includes(p)],
   // Deliberately NOT grouped: lucide-react icons and Radix/Floating UI
   // primitives. Each page uses a different handful, so letting Rollup split
   // them per page keeps the landing page from downloading every icon and menu

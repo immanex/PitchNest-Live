@@ -243,7 +243,7 @@ export default function PublicBusinessProfile() {
       "@type": "Organization",
       name: business.name,
       description: business.description || business.tagline,
-      url: business.websiteUrl || `https://www.pitchnest.app/businesses/${business.slug}`,
+      url: business.websiteUrl || `${window.location.origin}/businesses/${business.slug}`,
       areaServed: business.region || undefined,
       industry: business.industry || undefined,
     });

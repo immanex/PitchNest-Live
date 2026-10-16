@@ -1,13 +1,14 @@
 # PitchNest production deployment guide
 
-This guide deploys the React/Vite frontend to Vercel, the Express/WebSocket
+This guide deploys the React/Vite frontend to Cloudflare Workers, the Express/WebSocket
 backend to Render, and PostgreSQL plus object storage to Supabase. Keep staging
 and production in separate projects and never reuse their secrets.
 
 ## 1. Prerequisites
 
 - Node.js 24 LTS locally and in CI.
-- A Supabase project, a Render web service, and a Vercel project.
+- A Supabase project, a Render web service, and a Cloudflare Workers project
+  connected to this GitHub repository.
 - An Azure OpenAI deployment or OpenAI API key.
 - Azure Speech credentials for live transcription and voice.
 - A verified Resend sender domain before sending production email.
@@ -134,8 +135,9 @@ browser return URL is not proof of payment.
 
 ## 4. Configure and deploy the frontend
 
-Use `frontend` as the Vercel root, `npm run build` as the build command, and
-`dist` as the output directory. Set:
+Use `frontend` as the Cloudflare project root, `npm run build` as the build
+command, and `dist` as the static assets directory, served as a single-page
+application. Set these as build variables:
 
 ```env
 VITE_API_URL=https://YOUR-BACKEND.onrender.com
@@ -146,14 +148,15 @@ VITE_GOOGLE_CLIENT_ID=YOUR-GOOGLE-CLIENT-ID
 Both backend URLs must be secure origins. Local development may use
 `http://localhost:3000` and `ws://localhost:3000/ws`.
 
-`frontend/vercel.json` contains a Content Security Policy and crawler rewrites
-for the current production backend. When deploying under another backend host,
-replace every `pitchnestv1.onrender.com` occurrence in that file with the exact
-new hostname. A Vite variable cannot dynamically change a response header.
+Not yet configured on Cloudflare: security response headers (a Content
+Security Policy), forwarding `/sitemap.xml` to the backend, and forwarding
+social-crawler requests for `/businesses/:slug` to the backend's
+`/api/public/businesses/:slug/share-html` for link previews.
 
-Add the final frontend origin to `ALLOWED_ORIGIN` on Render. Add preview origins
-individually through `CORS_EXTRA_ORIGINS`; wildcard preview domains are not
-accepted.
+Set the frontend origin (for example
+`https://pitchnest-live.etim0052.workers.dev`) as `ALLOWED_ORIGIN` and
+`CLIENT_URL` on Render. Add any other origins individually through
+`CORS_EXTRA_ORIGINS`; wildcard domains are not accepted.
 
 ## 5. Pre-deployment verification
 

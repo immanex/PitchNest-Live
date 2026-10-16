@@ -55,7 +55,7 @@ export default function PrivacyPolicy() {
         <li><strong>Flutterwave</strong> — hosted payment checkout and payment verification.</li>
         <li><strong>Google</strong> — optional Google Identity sign-in and hosted web fonts.</li>
         <li><strong>Tavily or Serper</strong> — optional market research using business descriptions and industry terms when research is enabled.</li>
-        <li><strong>Hosting providers</strong> — e.g., Render (backend), Vercel (frontend), as configured for deployment.</li>
+        <li><strong>Hosting providers</strong> — Render (backend) and Cloudflare (frontend).</li>
       </ul>
       <p>These providers process data on our behalf under their own privacy policies and security practices.</p>
 

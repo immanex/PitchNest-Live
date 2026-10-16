@@ -21,8 +21,8 @@ services:
         generateValue: true
       - key: GOOGLE_CLIENT_ID
         sync: false
-      # The frontend's Vercel address (or custom domain), no trailing
-      # slash. CORS accepts only exact origins; "*" is not honoured.
+      # The frontend's Cloudflare address (or custom domain), no trailing
+      # slash. CORS accepts only exact origins; "*" fails the boot check.
       - key: ALLOWED_ORIGIN
         sync: false
       - key: CORS_EXTRA_ORIGINS

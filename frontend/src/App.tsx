@@ -6,7 +6,6 @@ import {
   Navigate,
   Outlet,
 } from "react-router-dom";
-import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
 // The landing page is the most common first screen, so it ships in the main
 // bundle. Every other page loads on demand (see lazyPage) — a visitor reading
 // the landing page no longer downloads the pitch room, charts, forms and the
@@ -78,7 +77,6 @@ export default function App() {
         <ThemeProvider>
           <BillingProvider>
           <UpgradeProvider>
-          <VercelAnalytics />
           {/* Outer boundaries for on-demand pages. Pages inside the sidebar
               layout have their own Suspense around the Outlet (AppLayout), so
               moving between app pages keeps the sidebar on screen. */}

@@ -8,7 +8,9 @@ interface PageMetadata {
   image?: string;
 }
 
-const SITE_ORIGIN = "https://www.pitchnest.app";
+// The origin the app is actually served from, so canonical and share URLs
+// follow the deployment instead of a hardcoded domain.
+const SITE_ORIGIN = window.location.origin;
 
 function ensureMeta(selector: string, attributes: Record<string, string>) {
   let element = document.head.querySelector<HTMLMetaElement>(selector);
