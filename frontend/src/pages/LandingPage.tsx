@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, Users, ShieldCheck, FileText, Target, TrendingUp, ChevronDown, Zap,
-  Phone, Mail, Menu, X, CheckCircle2, Compass, Mic, Keyboard, Lightbulb, Lock, MessageCircle,
+  Phone, Mail, Menu, X, CheckCircle2, Compass, Mic, Keyboard, Lightbulb, Lock, MessageCircle, Trophy,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -10,8 +10,6 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { SmoothScroll } from '../components/landing/SmoothScroll';
 import { SectionReveal } from '../components/landing/SectionReveal';
 import { HeroWords, heroBlock, heroEase } from '../components/landing/HeroWords';
-import { DiscoverShowcase } from '../components/landing/DiscoverShowcase';
-import { PlatformOverview } from '../components/landing/PlatformOverview';
 import { HeroVisual, LivePanelPreview, ReportPreview } from '../components/landing/ProductPreviews';
 import { LogoLink, LogoMark } from '../components/Logo';
 import { getPlans } from '../lib/plans';
@@ -25,16 +23,25 @@ const ROOMS = [
 ];
 
 const roomFeatures = [
-  { icon: Users, title: 'Panel, Coach or Solo', desc: 'Face three investors at once, work 1-on-1 with a coach, or pitch alone and get scored afterwards.' },
-  { icon: Target, title: 'Ten investor personas', desc: 'Seed VC, angel group, YC partner, family office, impact investor and more, each as tough as you set it.' },
-  { icon: FileText, title: 'Reads your deck', desc: 'Questions grounded in your slides and numbers, not generic pitch clichés.' },
-  { icon: Keyboard, title: 'Speak or type', desc: 'Pitch out loud, or type an answer when you would rather not speak.' },
-  { icon: Lightbulb, title: 'Coaching as you go', desc: 'Short on-screen tips on what each question is really probing, without handing you a script.' },
-  { icon: TrendingUp, title: 'Remembers your last attempt', desc: 'Re-pitch and the panel welcomes you back, checking whether last time\'s weak spots are fixed.' },
+  { icon: Users, title: 'Three investors at once', desc: 'Or a 1-on-1 coach, or solo.' },
+  { icon: FileText, title: 'Reads your deck', desc: 'Questions from your own slides.' },
+  { icon: TrendingUp, title: 'Remembers your last try', desc: 'Checks your fixes landed.' },
+  { icon: Target, title: 'Ten investor personas', desc: 'Angel to family office.' },
+  { icon: Lightbulb, title: 'Coaching as you go', desc: 'What each question probes.' },
+  { icon: Keyboard, title: 'Speak or type', desc: 'Out loud or by keyboard.' },
+];
+
+/**
+ * Secondary links, kept low on the page while Discover and Opportunities are
+ * still building up activity. The panel is the product this page sells.
+ */
+const extras = [
+  { icon: Compass, title: 'Discover', desc: "Give your business a public profile when you're ready to be found. Nothing goes public until you confirm.", to: '/discover' },
+  { icon: Trophy, title: 'Opportunities', desc: 'Accelerators, grants, competitions and fellowships, with official links to apply.', to: '/opportunities' },
 ];
 
 const steps = [
-  { step: '01', title: 'Set up', desc: 'Pick your panel, set how tough it should be and attach your deck, or start from a business in your workspace.' },
+  { step: '01', title: 'Set up', desc: 'Pick your panel, set how tough it should be and attach your deck.' },
   { step: '02', title: 'Pitch out loud', desc: 'Speak naturally. The panel listens, interrupts with follow-ups and debates your answers in real time.' },
   { step: '03', title: 'Review and re-pitch', desc: 'Get a scored report in minutes, fix the gaps and go again. The panel remembers your last attempt.' },
 ];
@@ -45,16 +52,15 @@ const steps = [
  * the prescriptive material lives in the downloadable PDF (a paid feature).
  * Listing PDF items as on-screen would overclaim for every free user.
  */
-const reportItems: { lead: string; rest: string; pdfOnly?: boolean }[] = [
-  { lead: 'Verdict and summary', rest: 'invest, watch or decline, and why, in plain language.' },
-  { lead: 'Readiness scorecard', rest: 'delivery, clarity, scalability and readiness, scored out of 100.' },
-  { lead: 'Delivery analytics', rest: 'every question the panel asked and how your confidence moved.' },
-  { lead: 'Strengths and critical risks', rest: 'what landed, and the red flags to fix first.' },
-  { lead: 'Progress tracking', rest: 'this attempt measured against your last one.' },
-  { lead: 'Prioritised action plan', rest: 'ranked fixes to make before your next session.', pdfOnly: true },
-  { lead: 'Toughest questions', rest: 'the ones you fumbled, with a structure to answer them.', pdfOnly: true },
-  { lead: 'Competitive landscape and SWOT', rest: 'competitors and gaps, with estimates labelled as such.', pdfOnly: true },
-  { lead: 'Filler words and talk ratio', rest: 'measured from what you actually said.', pdfOnly: true },
+const reportGroups = [
+  {
+    title: 'On screen · every plan',
+    items: ['Verdict: invest, watch or decline', 'Scores out of 100', 'Every question asked', 'Strengths and red flags', 'Progress since last time'],
+  },
+  {
+    title: 'In the PDF · paid plans',
+    items: ['Ranked action plan', 'Your toughest questions', 'Competitors and SWOT', 'Filler words and talk ratio'],
+  },
 ];
 
 const whyItems = [
@@ -65,20 +71,20 @@ const whyItems = [
 ];
 
 const faqs = [
-  { q: "What is PitchNest?", a: "One place to prepare and showcase your startup. Rehearse in private with an AI investor panel that questions your deck and scores your readiness, then publish a business profile on Discover when you're ready to be found." },
+  { q: "What is PitchNest?", a: "A live AI investor panel you pitch to out loud. It reads your deck, questions you the way real partners do and scores your readiness, so you can fix the gaps before the real meeting." },
   { q: "How realistic is the panel?", a: "It asks the kind of pointed, adaptive questions real partners do, and debates your answers out loud. It's practice, not a prediction of any investor's decision." },
+  { q: "How is this different from asking a chatbot to play an investor?", a: "Three investors with different angles question you together, building on or pushing back on each other's points when it matters. Their questions come from your own deck. Every session is scored on the same scorecard, so you can see whether you're improving, and the panel remembers what was weak last time." },
   { q: "Can I upload my pitch deck?", a: "Yes. The panel reads it and asks questions grounded in your slides and numbers." },
   { q: "What do I get after a session?", a: "A readiness report on screen, on every plan: the verdict, the scorecard across delivery, clarity, scalability and readiness, every question the panel asked, and how your confidence moved. The downloadable report adds the prioritised action plan, the questions to prepare for, the competitive landscape and SWOT, and practice drills." },
+  { q: "Is it free?", a: "There's a free plan: 2 pitch sessions a week, 10 minutes each, with your full report on screen. Paid plans add unlimited sessions, longer pitch durations and the downloadable PDF report, and Pro adds live market research in the panel. Discover, business profiles and the opportunities board are free." },
   { q: "What is Discover?", a: "A public directory of founder-run businesses: software, services, physical products and traditional businesses. Create a business in your workspace, preview exactly what will be shown, and publish when you're ready. You can unpublish at any time." },
   { q: "If I publish my business, is my practice still private?", a: "Yes. Decks, recordings, transcripts and reports never appear on your public profile. Someone else can see a report only if you turn on its share link, and you can turn that off again whenever you like." },
-  { q: "Is it free?", a: "There's a free plan: 2 pitch sessions a week, 10 minutes each, with your full report on screen. Paid plans add unlimited sessions, longer pitch durations and the downloadable PDF report, and Pro adds live market research in the panel. Discover, business profiles and the opportunities board are free." },
 ];
 
 const navLinks = [
-  { href: "#platform", label: "Platform" },
-  { href: "#room", label: "Rehearsal" },
-  { href: "/discover", label: "Discover" },
-  { href: "/opportunities", label: "Opportunities" },
+  { href: "#room", label: "The panel" },
+  { href: "#how-it-works", label: "How it works" },
+  { href: "#your-report", label: "Your report" },
   { href: "#pricing", label: "Pricing" },
   { href: "#faq", label: "FAQ" },
 ];
@@ -204,22 +210,22 @@ export default function LandingPage() {
               >
                 <motion.div variants={heroBlock} className="mb-6">
                   <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-slate-200 bg-white/80 px-3.5 py-1.5 text-[12px] font-semibold text-slate-600 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-accent-strong" />
-                    Pitch practice <span className="text-slate-300 dark:text-zinc-600">·</span> Business profiles <span className="text-slate-300 dark:text-zinc-600">·</span> Opportunities
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent-strong animate-pulse" />
+                    Live AI investor panel <span className="text-slate-300 dark:text-zinc-600">·</span> Reads your deck
                   </span>
                 </motion.div>
 
                 <HeroWords />
 
                 <motion.p variants={heroBlock} className="mt-6 mb-8 text-base sm:text-lg leading-relaxed text-slate-600 dark:text-zinc-400 max-w-xl">
-                  Rehearse with an AI investor panel that questions your deck and scores your
-                  readiness. When you're ready, give your business a public profile, share your
-                  progress and find your next accelerator, grant or competition.
+                  Pitch out loud to three AI investors. They read your deck, interrupt with
+                  follow-ups and debate your answers, then score your readiness so you know
+                  exactly what to fix before the real meeting.
                 </motion.p>
 
                 <motion.div variants={heroBlock} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <Link to={startHref} className="btn-primary justify-center px-7 py-3.5 text-base">
-                    Start free <ArrowRight size={18} />
+                    Start a free session <ArrowRight size={18} />
                   </Link>
                   <Link to="/discover" className="btn-secondary justify-center px-7 py-3.5 text-base">
                     <Compass size={18} /> Explore Discover
@@ -227,7 +233,7 @@ export default function LandingPage() {
                 </motion.div>
 
                 <motion.ul variants={heroBlock} className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-500 dark:text-zinc-400">
-                  {['No card needed', '2 free sessions every week', 'Private until you publish'].map((item) => (
+                  {['No card needed', '2 free sessions every week', 'Private by default'].map((item) => (
                     <li key={item} className="flex items-center gap-1.5">
                       <CheckCircle2 size={16} className="text-emerald-500" /> {item}
                     </li>
@@ -266,9 +272,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── Platform ── (flag-gated features show as "Soon" until switched on) */}
-        <PlatformOverview isLoggedIn={isLoggedIn} />
-
         {/* ── The rehearsal room ── */}
         <section id="room" className="relative overflow-hidden bg-[#0B1530] py-[clamp(48px,6vw,88px)] text-white scroll-mt-20">
           <div aria-hidden className="pointer-events-none absolute -top-32 right-0 h-96 w-96 rounded-full bg-indigo-500/25 blur-3xl" />
@@ -280,9 +283,7 @@ export default function LandingPage() {
                 A panel that pushes back, so the real room doesn't surprise you
               </h2>
               <p className="mt-4 text-base leading-relaxed text-white/70 max-w-xl">
-                Most founders find the gaps live, when a lead is already on the line. Here you pitch out
-                loud to AI investors who listen, interrupt with hard follow-ups and debate your answers,
-                so nothing surprises you in the real room.
+                Find the gaps here, not when a lead is on the line.
               </p>
               <ul className="mt-8 grid sm:grid-cols-2 gap-x-6 gap-y-5">
                 {roomFeatures.map((f) => (
@@ -342,36 +343,29 @@ export default function LandingPage() {
               <p className="eyebrow">Your report</p>
               <h2 className="section-heading mt-3">Walk away with a plan, not just a score</h2>
               <p className="section-subheading mt-4">
-                The moment you finish, PitchNest writes a readiness report: the kind of prep a pitch
-                coach would charge for. Re-pitch and it shows whether your fixes landed.
+                A scored report the moment you finish. Re-pitch and see if your fixes landed.
               </p>
-              <ul className="mt-7 space-y-3">
-                {reportItems.map((item) => (
-                  <li key={item.lead} className="flex gap-3 text-sm leading-relaxed">
-                    <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-indigo-500 dark:text-indigo-400" />
-                    <p className="text-slate-600 dark:text-zinc-300">
-                      <span className="font-semibold text-slate-800 dark:text-zinc-100">{item.lead}</span> — {item.rest}
-                      {item.pdfOnly && (
-                        <span className="ml-2 align-middle inline-block rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-slate-200/70 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400">
-                          PDF
-                        </span>
-                      )}
-                    </p>
-                  </li>
+              <div className="mt-7 grid sm:grid-cols-2 gap-6">
+                {reportGroups.map((group) => (
+                  <div key={group.title}>
+                    <h3 className="font-sans text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">{group.title}</h3>
+                    <ul className="mt-3 space-y-2.5">
+                      {group.items.map((item) => (
+                        <li key={item} className="flex gap-2.5 text-sm text-slate-700 dark:text-zinc-200">
+                          <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-indigo-500 dark:text-indigo-400" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
-              </ul>
-              <p className="mt-5 text-xs text-slate-400 dark:text-zinc-500">
-                Items marked PDF are in the downloadable report on paid plans. Everything else is on screen on every plan.
-              </p>
+              </div>
             </SectionReveal>
           </div>
         </section>
 
-        {/* ── Discover (real published businesses only) ── */}
-        <DiscoverShowcase isLoggedIn={isLoggedIn} />
-
         {/* ── Why it works ── */}
-        <section className="py-[clamp(40px,5vw,64px)] border-t border-slate-100 dark:border-zinc-800/60">
+        <section className="py-[clamp(40px,5vw,64px)]">
           <div className="max-w-295 mx-auto px-5 sm:px-7 grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {whyItems.map((item, i) => (
               <SectionReveal key={item.title} delay={i * 0.05}>
@@ -464,6 +458,33 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* ── Also included: deliberately secondary until these have real activity ── */}
+        <section aria-labelledby="also-included" className="pt-[clamp(32px,4vw,48px)]">
+          <div className="max-w-295 mx-auto px-5 sm:px-7">
+            <SectionReveal>
+              <h2 id="also-included" className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-4">
+                Also free with your account
+              </h2>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {extras.map((item) => (
+                  <Link key={item.to} to={item.to} className="card-hover group flex items-start gap-4 p-5">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
+                      <item.icon size={18} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-display text-base font-semibold flex items-center gap-1.5">
+                        {item.title}
+                        <ArrowRight size={15} className="text-slate-400 transition-transform group-hover:translate-x-0.5" />
+                      </p>
+                      <p className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-zinc-400">{item.desc}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </SectionReveal>
+          </div>
+        </section>
+
         {/* ── FAQ ── */}
         <section id="faq" className="py-[clamp(48px,6vw,80px)] scroll-mt-20">
           <div className="max-w-295 mx-auto px-5 sm:px-7 grid lg:grid-cols-12 gap-10 items-start">
@@ -499,15 +520,12 @@ export default function LandingPage() {
               <div className="relative mx-auto max-w-2xl">
                 <h2 className="font-display text-3xl sm:text-4xl font-semibold leading-tight">Your next pitch starts here.</h2>
                 <p className="mt-4 text-base leading-relaxed text-white/70">
-                  Rehearse until it's sharp, publish when you're proud of it, and take the next opportunity
-                  with confidence.
+                  Face the panel until the hard questions feel easy. Two free sessions every week,
+                  no card needed.
                 </p>
                 <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
                   <Link to={startHref} className="btn-accent px-7 py-3.5 text-base">
-                    Start free <ArrowRight size={18} />
-                  </Link>
-                  <Link to="/discover" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 px-7 py-3.5 text-base font-semibold text-white transition-colors hover:bg-white/10">
-                    <Compass size={18} /> Explore Discover
+                    <Mic size={18} /> Start a free session
                   </Link>
                 </div>
               </div>

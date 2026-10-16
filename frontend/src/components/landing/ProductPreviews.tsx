@@ -1,4 +1,4 @@
-import { CheckCircle2, Compass, Lightbulb, Mic, TrendingUp, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, Lightbulb, Mic, TrendingUp, AlertTriangle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 /**
@@ -19,7 +19,7 @@ const PANEL = [
 const floatCard =
   'rounded-2xl border border-slate-200/80 bg-white/95 shadow-xl shadow-slate-900/10 backdrop-blur dark:border-zinc-700/80 dark:bg-zinc-900/95 dark:shadow-black/40';
 
-/** Hero: a founder mid-pitch, with the three things PitchNest gives them. */
+/** Hero: a founder mid-pitch, two investors pressing them, and the score. */
 export function HeroVisual() {
   return (
     <div className="relative" aria-hidden="true">
@@ -78,19 +78,18 @@ export function HeroVisual() {
         </div>
       </div>
 
-      {/* The public profile */}
-      <div className={cn(floatCard, 'absolute -right-3 bottom-14 hidden w-56 p-3.5 md:block xl:-right-8')}>
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-accent-ink">
-            <Compass size={17} />
+      {/* A second investor pushes back on the first answer */}
+      <div className={cn(floatCard, 'absolute -right-3 bottom-14 hidden w-60 p-3.5 md:block xl:-right-8')}>
+        <div className="flex items-center gap-2">
+          <span className={cn('flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white', PANEL[1].tone)}>
+            {PANEL[1].initial}
           </span>
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-bold text-slate-900 dark:text-zinc-100">Your business</p>
-            <p className="truncate text-[11px] text-slate-500 dark:text-zinc-400">Profile · updates · followers</p>
-          </div>
+          <span className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400">
+            {PANEL[1].name} cuts in
+          </span>
         </div>
-        <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Published on Discover
+        <p className="mt-2 text-[13px] font-medium leading-snug text-slate-800 dark:text-zinc-100">
+          "Fourteen months' retention, across how many customers?"
         </p>
       </div>
     </div>
